@@ -302,6 +302,8 @@ class PaperRepository {
     }
     final modelId = settings.chatModel;
     const renderer = PageRenderService();
+    // One document shared by all workers; closed after every worker is done.
+    final document = await renderer.openDocument(pdfPath);
     final ocr = VisionOcrService(settings: settings);
 
     final queue = pages.toSet().toList()..sort();
@@ -315,7 +317,7 @@ class PaperRepository {
       while (failure == null && next < queue.length) {
         final page = queue[next++];
         try {
-          final png = await renderer.renderPage(pdfPath, page);
+          final png = await renderer.renderDocumentPage(document, page);
           texts[page] = await ocr.ocrPage(png, modelId: modelId);
           done++;
           onProgress?.call(
@@ -336,6 +338,7 @@ class PaperRepository {
       ]);
     } finally {
       ocr.close();
+      await document.dispose();
     }
     if (failure != null) {
       Error.throwWithStackTrace(failure!, failureStack ?? StackTrace.current);
