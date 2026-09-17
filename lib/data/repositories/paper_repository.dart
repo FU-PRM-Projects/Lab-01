@@ -2,16 +2,20 @@ import 'package:path/path.dart' as p;
 import 'package:lab_05/data/models/index_state.dart';
 
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'package:lab_05_rust/paper_native.dart' as rust_pdf;
 
 import 'package:lab_05/data/services/collection_index.dart';
 import 'package:lab_05/data/services/embedding_client.dart';
 import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/data/services/pdf_processor.dart';
 import 'package:lab_05/data/services/local_storage.dart';
+import 'package:lab_05/data/services/page_render_service.dart';
+import 'package:lab_05/data/services/vision_ocr_service.dart';
 
 typedef ImportProgressCallback = void Function(String stage, double progress);
 
@@ -103,9 +107,71 @@ class PaperRepository {
         fallbackTitle: paperDoc.title,
       );
 
-      if (extractResult.chunks.isEmpty) {
+      final totalPages = extractResult.pageCount;
+      final ocrPages = extractResult.needsOcrPages;
+      final hasText = extractResult.chunks.isNotEmpty;
+      var chunksToIndex = extractResult.chunks;
+
+      if (ocrPages.isNotEmpty) {
+        // Scanned or hybrid PDF: OCR the flagged pages before indexing.
+        debugPrint(
+          '[import] $documentId ($originalFileName): '
+          'pdfType=${extractResult.pdfType}, '
+          'totalPages=$totalPages, '
+          'needsOcr=${ocrPages.length} (pages: ${ocrPages.join(', ')}), '
+          'emptyPages=${extractResult.emptyPages.length}, '
+          'textChunks=${extractResult.chunks.length}',
+        );
+        final ocrChunks = await _ocrPages(
+          pdfPath: targetPdfPath,
+          documentId: documentId,
+          pages: ocrPages,
+          textChunks: extractResult.chunks,
+          onProgress: onProgress,
+        );
+
+        // A page that was OCR'd keeps only its OCR chunks, so text and OCR
+        // chunks never mix on the same page (their ordinals are unrelated).
+        final ocrPageSet = ocrChunks.map((c) => c.page).toSet();
+        final merged = [
+          ...extractResult.chunks.where((c) => !ocrPageSet.contains(c.page)),
+          ...ocrChunks,
+        ]..sort((a, b) {
+            final byPage = a.page.compareTo(b.page);
+            return byPage != 0 ? byPage : a.ordinal.compareTo(b.ordinal);
+          });
+        chunksToIndex = [
+          for (var i = 0; i < merged.length; i++)
+            PaperChunk(
+              id: merged[i].id,
+              vectorId: merged[i].vectorId,
+              page: merged[i].page,
+              ordinal: i,
+              section: merged[i].section,
+              startChar: merged[i].startChar,
+              endChar: merged[i].endChar,
+              text: merged[i].text,
+            ),
+        ];
+        debugPrint(
+          '[import] $documentId: OCR gave ${ocrChunks.length} chunks from '
+          '${ocrPageSet.length}/${ocrPages.length} pages; '
+          'total chunks=${chunksToIndex.length}',
+        );
+
+        if (chunksToIndex.isEmpty) {
+          throw StateError(
+            'OCR ran on ${ocrPages.length}/$totalPages pages but found no text '
+            '(pdfType: ${extractResult.pdfType}). The pages may be blank.',
+          );
+        }
+      } else if (!hasText) {
+        // No text and nothing flagged for OCR: unreadable or broken PDF.
         throw StateError(
-          'No extractable text found in PDF. The document may be image-only/scanned, which requires OCR.',
+          'Could not read any content from PDF '
+          '(pdfType: ${extractResult.pdfType}, pages: $totalPages, '
+          'empty pages: ${extractResult.emptyPages.length}). '
+          'The file may be corrupted or unsupported.',
         );
       }
 
@@ -117,7 +183,7 @@ class PaperRepository {
 
       int currentVectorId = collection.nextVectorId;
       final List<PaperChunk> assignedChunks = [];
-      for (final chunk in extractResult.chunks) {
+      for (final chunk in chunksToIndex) {
         assignedChunks.add(
           PaperChunk(
             id: chunk.id,
@@ -209,5 +275,134 @@ class PaperRepository {
       await storage.savePaper(collectionId, paperDoc);
       rethrow;
     }
+  }
+
+  static const _maxConcurrentOcr = 3;
+
+  /// Same pattern as `section_regex` in rust/src/api/pdf_parser.rs, so OCR
+  /// chunks get the same section names as text chunks.
+  static final _sectionRegex = RegExp(
+    r'^(?:\d+(?:\.\d+)*\s+)?(Abstract|Introduction|Background|Related\s+Work|Methodology|Method|Architecture|Implementation|Evaluation|Experiments?|Results?|Discussion|Conclusion|References)\b',
+    caseSensitive: false,
+  );
+
+  /// Renders and OCRs [pages], at most [_maxConcurrentOcr] at a time, then
+  /// chunks the text with the same Rust chunker used for text pages.
+  /// Returns only after every page is done; any page failure fails the import.
+  Future<List<PaperChunk>> _ocrPages({
+    required String pdfPath,
+    required String documentId,
+    required List<int> pages,
+    required List<PaperChunk> textChunks,
+    ImportProgressCallback? onProgress,
+  }) async {
+    final settings = await storage.loadSettings();
+    if (settings.openRouterApiKey.trim().isEmpty) {
+      throw StateError('OpenRouter API key is required for OCR.');
+    }
+    final modelId = settings.chatModel;
+    const renderer = PageRenderService();
+    final ocr = VisionOcrService(settings: settings);
+
+    final queue = pages.toSet().toList()..sort();
+    final texts = <int, String>{};
+    var next = 0;
+    var done = 0;
+    Object? failure;
+    StackTrace? failureStack;
+
+    Future<void> worker() async {
+      while (failure == null && next < queue.length) {
+        final page = queue[next++];
+        try {
+          final png = await renderer.renderPage(pdfPath, page);
+          texts[page] = await ocr.ocrPage(png, modelId: modelId);
+          done++;
+          onProgress?.call(
+            'OCR $done/${queue.length} pages ($modelId)...',
+            0.3 + 0.2 * done / queue.length,
+          );
+        } catch (e, stack) {
+          failure ??= StateError('OCR failed on page $page: $e');
+          failureStack ??= stack;
+        }
+      }
+    }
+
+    try {
+      await Future.wait([
+        for (var i = 0; i < min(_maxConcurrentOcr, queue.length); i++)
+          worker(),
+      ]);
+    } finally {
+      ocr.close();
+    }
+    if (failure != null) {
+      Error.throwWithStackTrace(failure!, failureStack ?? StackTrace.current);
+    }
+
+    // Section tracking mirrors the Rust parser: start at "Introduction",
+    // carry the current section forward page by page, and let the first
+    // matching heading on a page set the section for that whole page.
+    final ocrPageSet = queue.toSet();
+    final sortedText = textChunks
+        .where((c) => !ocrPageSet.contains(c.page))
+        .toList()
+      ..sort((a, b) {
+        final byPage = a.page.compareTo(b.page);
+        return byPage != 0 ? byPage : a.ordinal.compareTo(b.ordinal);
+      });
+    var currentSection = 'Introduction';
+    var textIndex = 0;
+
+    final chunks = <PaperChunk>[];
+    for (final page in queue) {
+      // Pick up the section reached by text pages that come before this page.
+      while (textIndex < sortedText.length &&
+          sortedText[textIndex].page < page) {
+        currentSection = sortedText[textIndex].section;
+        textIndex++;
+      }
+
+      final text = texts[page]?.trim() ?? '';
+      if (text.isEmpty) {
+        debugPrint('[import] $documentId: OCR page $page is blank');
+        continue;
+      }
+
+      for (final line in text.split('\n')) {
+        final trimmed = line.trim().replaceFirst(RegExp(r'^#+'), '').trim();
+        final match = _sectionRegex.firstMatch(trimmed);
+        if (match != null) {
+          currentSection = match.group(0)!;
+          break;
+        }
+      }
+
+      final pageChunks = await rust_pdf.chunkText(
+        pageText: text,
+        pageNum: page,
+        documentId: documentId,
+        section: currentSection,
+        startOrdinal: 0,
+      );
+      for (final rc in pageChunks) {
+        chunks.add(
+          PaperChunk(
+            // ':ocr' in the id (not the section) marks OCR chunks and keeps
+            // ids from clashing with text chunks on the same page.
+            id: '$documentId:p${rc.page}:ocr${rc.ordinal}',
+            vectorId: 0,
+            page: rc.page,
+            ordinal: rc.ordinal,
+            section: rc.section,
+            startChar: rc.startChar,
+            endChar: rc.endChar,
+            text: rc.text,
+          ),
+        );
+      }
+    }
+    return chunks;
   }
 }
