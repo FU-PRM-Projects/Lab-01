@@ -79,11 +79,20 @@ class ChatController extends StateNotifier<ChatState> {
     if (text.trim().isEmpty || state.isStreaming) return;
     final collection = _ref.read(currentCollectionProvider);
     final settings = _ref.read(settingsProvider);
-    if (collection == null || settings.openRouterApiKey.trim().isEmpty) {
+    final usingGemini = settings.provider == 'gemini';
+    // Embeddings always go through OpenRouter, so that key is required
+    // regardless of which provider answers the chat turn.
+    final missingOpenRouterKey = settings.openRouterApiKey.trim().isEmpty;
+    final missingChatKey = usingGemini
+        ? settings.geminiApiKey.trim().isEmpty
+        : missingOpenRouterKey;
+    if (collection == null || missingOpenRouterKey || missingChatKey) {
       state = ChatState(
         errorMessage: collection == null
             ? 'Please select or create a collection first'
-            : 'Please enter your OpenRouter API Key in Settings',
+            : missingOpenRouterKey
+            ? 'Please enter your OpenRouter API Key in Settings'
+            : 'Please enter your Gemini API Key in Settings',
       );
       return;
     }
@@ -119,7 +128,10 @@ class ChatController extends StateNotifier<ChatState> {
       await storage.saveChat(collection.id, updated);
       if (!_isCurrent(generation)) return;
       _ref.read(currentChatProvider.notifier).state = updated;
-      final turn = _ChatTurn(updated, settings.chatModel);
+      final turn = _ChatTurn(
+        updated,
+        usingGemini ? settings.geminiModel : settings.chatModel,
+      );
       _turn = turn;
       unawaited(_ref.read(chatsProvider.notifier).refresh());
       final index = await _ref
@@ -134,12 +146,13 @@ class ChatController extends StateNotifier<ChatState> {
       );
       _embeddings = embeddings;
       final agent = ResearchAgent(
-        apiKey: settings.openRouterApiKey,
-        chatModel: settings.chatModel,
+        apiKey: usingGemini ? settings.geminiApiKey : settings.openRouterApiKey,
+        chatModel: usingGemini ? settings.geminiModel : settings.chatModel,
         baseUrl: settings.openRouterBaseUrl,
         storage: storage,
         embeddings: embeddings,
         index: index,
+        provider: settings.provider,
       );
       _agent = agent;
       var pendingUpdate = false;
