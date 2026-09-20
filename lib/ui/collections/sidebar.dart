@@ -79,6 +79,9 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
     final pinnedCollections = collections
         .where((collection) => pinnedIds.contains(collection.id))
         .toList(growable: false);
+    final projectCollections = collections
+        .where((collection) => !pinnedIds.contains(collection.id))
+        .toList(growable: false);
 
     return AbsorbPointer(
       absorbing: ref.watch(importControllerProvider) != null,
@@ -319,14 +322,16 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                   ),
 
                   // Collection items
-                  if (collections.isEmpty)
+                  if (projectCollections.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 8,
                       ),
                       child: Text(
-                        'No collections yet',
+                        collections.isEmpty
+                            ? 'No projects yet'
+                            : 'All projects are pinned',
                         style: textTheme.bodySmall?.copyWith(
                           fontSize: 13,
                           color: colorScheme.onSurfaceVariant.withValues(
@@ -336,7 +341,7 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                       ),
                     )
                   else
-                    ...collections.map((col) {
+                    ...projectCollections.map((col) {
                       final isSelected = currentCol?.id == col.id;
                       final isExpanded =
                           _expandedCollections.contains(col.id) || isSelected;
