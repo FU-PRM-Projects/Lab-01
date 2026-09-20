@@ -6,6 +6,7 @@ class AppSettings {
   final int defaultEmbeddingDimensions;
   final String openRouterBaseUrl;
   final String openRouterApiKey;
+  final List<String> pinnedCollectionIds;
 
   static const String defaultOpenRouterBaseUrl = 'https://openrouter.ai/api/v1';
   static const String defaultChatModel = 'deepseek/deepseek-v4.1-flash';
@@ -18,6 +19,7 @@ class AppSettings {
     this.defaultEmbeddingDimensions = 768,
     this.openRouterBaseUrl = defaultOpenRouterBaseUrl,
     this.openRouterApiKey = '',
+    this.pinnedCollectionIds = const [],
   });
 
   String get apiBaseUrl {
@@ -38,6 +40,7 @@ class AppSettings {
     int? defaultEmbeddingDimensions,
     String? openRouterBaseUrl,
     String? openRouterApiKey,
+    List<String>? pinnedCollectionIds,
   }) {
     return AppSettings(
       schemaVersion: schemaVersion,
@@ -49,6 +52,7 @@ class AppSettings {
           defaultEmbeddingDimensions ?? this.defaultEmbeddingDimensions,
       openRouterBaseUrl: openRouterBaseUrl ?? this.openRouterBaseUrl,
       openRouterApiKey: openRouterApiKey ?? this.openRouterApiKey,
+      pinnedCollectionIds: pinnedCollectionIds ?? this.pinnedCollectionIds,
     );
   }
 
@@ -72,6 +76,11 @@ class AppSettings {
           (json['openRouterApiKey'] as String?)?.trim() ??
           (json['apiKey'] as String?)?.trim() ??
           '',
+      pinnedCollectionIds:
+          (json['pinnedCollectionIds'] as List<dynamic>?)
+              ?.whereType<String>()
+              .toList(growable: false) ??
+          const [],
     );
   }
 
@@ -84,6 +93,7 @@ class AppSettings {
       'defaultEmbeddingDimensions': defaultEmbeddingDimensions,
       'openRouterBaseUrl': openRouterBaseUrl,
       'openRouterApiKey': openRouterApiKey,
+      'pinnedCollectionIds': pinnedCollectionIds,
     };
   }
 }

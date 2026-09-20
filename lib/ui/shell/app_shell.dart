@@ -29,7 +29,9 @@ class _AppShellState extends ConsumerState<AppShell> {
         SnackBar(
           content: const Text('Please select or create a collection first'),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
@@ -47,7 +49,9 @@ class _AppShellState extends ConsumerState<AppShell> {
             'OpenRouter API Key required for embeddings and indexing',
           ),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
@@ -78,7 +82,11 @@ class _AppShellState extends ConsumerState<AppShell> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                const Icon(
+                  Icons.check_circle_outline,
+                  color: Colors.white,
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -89,7 +97,9 @@ class _AppShellState extends ConsumerState<AppShell> {
             ),
             backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             duration: const Duration(seconds: 3),
           ),
         );
@@ -102,7 +112,9 @@ class _AppShellState extends ConsumerState<AppShell> {
             content: Text('Import error: $e'),
             backgroundColor: colorScheme.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             action: SnackBarAction(
               label: 'Retry',
               textColor: colorScheme.onError,
@@ -126,9 +138,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     final settings = ref.read(settingsProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final nextTheme = isDark ? 'light' : 'dark';
-    ref.read(settingsProvider.notifier).update(
-      settings.copyWith(theme: nextTheme),
-    );
+    ref
+        .read(settingsProvider.notifier)
+        .update(settings.copyWith(theme: nextTheme));
   }
 
   @override
@@ -159,10 +171,10 @@ class _AppShellState extends ConsumerState<AppShell> {
               children: [
                 // Material 3 Top Header Bar
                 Container(
-                  height: 52,
+                  height: 56,
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainer,
+                    color: colorScheme.surface,
                     border: Border(
                       bottom: BorderSide(
                         color: colorScheme.outlineVariant,
@@ -172,29 +184,25 @@ class _AppShellState extends ConsumerState<AppShell> {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: collection != null
-                              ? colorScheme.primaryContainer
-                              : colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.folder_outlined,
-                          size: 16,
-                          color: collection != null
-                              ? colorScheme.onPrimaryContainer
-                              : colorScheme.onSurfaceVariant,
+                      SizedBox(
+                        width: 24,
+                        height: 30,
+                        child: Center(
+                          child: Icon(
+                            Icons.folder_outlined,
+                            size: 18,
+                            color: colorScheme.onSurface,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Text(
-                        collection?.name ?? 'No Collection Selected',
+                        collection?.name ?? 'Select a project',
                         style: textTheme.titleSmall?.copyWith(
                           color: colorScheme.onSurface,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          letterSpacing: -0.1,
+                          letterSpacing: -0.15,
                         ),
                       ),
                       if (collection != null) ...[
@@ -202,13 +210,15 @@ class _AppShellState extends ConsumerState<AppShell> {
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
-                            vertical: 3,
+                            vertical: 2,
                           ),
                           decoration: BoxDecoration(
                             color: colorScheme.secondaryContainer,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                              color: colorScheme.outlineVariant.withValues(
+                                alpha: 0.5,
+                              ),
                             ),
                           ),
                           child: Text(
@@ -222,14 +232,20 @@ class _AppShellState extends ConsumerState<AppShell> {
                       ],
                       const Spacer(),
                       if (collection != null)
-                        FilledButton.tonalIcon(
+                        OutlinedButton.icon(
                           onPressed: _pickAndImportPaper,
-                          icon: const Icon(Icons.upload_file_outlined, size: 16),
-                          label: const Text('Import PDF'),
-                          style: FilledButton.styleFrom(
+                          icon: const Icon(
+                            Icons.upload_file_outlined,
+                            size: 16,
+                          ),
+                          label: const Text('Add source'),
+                          style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,
-                              vertical: 6,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             visualDensity: VisualDensity.compact,
                           ),
@@ -238,12 +254,31 @@ class _AppShellState extends ConsumerState<AppShell> {
 
                       // Quick Theme Switcher Button
                       IconButton(
-                        icon: Icon(
-                          isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                          size: 19,
-                          color: colorScheme.onSurfaceVariant,
+                        icon: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 140),
+                          transitionBuilder: (child, animation) =>
+                              RotationTransition(
+                                turns: Tween<double>(
+                                  begin: 0.85,
+                                  end: 1,
+                                ).animate(animation),
+                                child: FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                ),
+                              ),
+                          child: Icon(
+                            isDark
+                                ? Icons.light_mode_outlined
+                                : Icons.dark_mode_outlined,
+                            key: ValueKey(isDark),
+                            size: 19,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                        tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+                        tooltip: isDark
+                            ? 'Switch to Light Mode'
+                            : 'Switch to Dark Mode',
                         onPressed: _toggleTheme,
                       ),
 
@@ -312,7 +347,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                           child: LinearProgressIndicator(
                             value: importProgress.$2,
                             minHeight: 4,
-                            backgroundColor: colorScheme.surfaceContainerHighest,
+                            backgroundColor:
+                                colorScheme.surfaceContainerHighest,
                             color: colorScheme.primary,
                           ),
                         ),
@@ -330,13 +366,20 @@ class _AppShellState extends ConsumerState<AppShell> {
           ),
 
           // Side-by-side Source Inspection & PDF Panel
-          if (activeCitation != null)
-            SourcePanel(
-              citation: activeCitation,
-              onClose: () {
-                ref.read(activeCitationProvider.notifier).state = null;
-              },
-            ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.centerRight,
+            child: activeCitation == null
+                ? const SizedBox.shrink()
+                : SourcePanel(
+                    key: ValueKey(activeCitation.chunkId),
+                    citation: activeCitation,
+                    onClose: () {
+                      ref.read(activeCitationProvider.notifier).state = null;
+                    },
+                  ),
+          ),
         ],
       ),
     );

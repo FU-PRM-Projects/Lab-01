@@ -74,14 +74,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
     final colorScheme = context.colorScheme;
 
-    ref.listen(chatControllerProvider.select((s) => s.errorMessage), (prev, next) {
+    ref.listen(chatControllerProvider.select((s) => s.errorMessage), (
+      prev,
+      next,
+    ) {
       if (next != null && next.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(next),
             backgroundColor: colorScheme.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         );
       }
@@ -90,38 +95,62 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final messages = chat?.messages ?? [];
     final hasMessages = messages.isNotEmpty || isStreaming;
 
+    final Widget content;
     if (!hasMessages) {
-      return _buildEmptyState(context, collection?.name ?? 'your collection');
+      content = KeyedSubtree(
+        key: const ValueKey('empty-chat'),
+        child: _buildEmptyState(context, collection?.name ?? 'your collection'),
+      );
+    } else {
+      content = SelectionArea(
+        key: const ValueKey('active-chat'),
+        child: ListView.builder(
+          controller: _scrollController,
+          padding: const EdgeInsets.only(top: 24, bottom: 32),
+          itemCount: messages.length + (isStreaming ? 1 : 0),
+          itemBuilder: (context, index) {
+            final Widget item;
+            if (index < messages.length) {
+              final msg = messages[index];
+              item = _buildMessageItem(context, msg);
+            } else {
+              item = _StreamingMessageBubble(
+                onScrollNeeded: _scrollToBottom,
+                onCitationTap: _openCitation,
+              );
+            }
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 820),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: item,
+                ),
+              ),
+            );
+          },
+        ),
+      );
     }
 
-    return SelectionArea(
-      child: ListView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.only(top: 24, bottom: 32),
-        itemCount: messages.length + (isStreaming ? 1 : 0),
-        itemBuilder: (context, index) {
-          final Widget item;
-          if (index < messages.length) {
-            final msg = messages[index];
-            item = _buildMessageItem(context, msg);
-          } else {
-            item = _StreamingMessageBubble(
-              onScrollNeeded: _scrollToBottom,
-              onCitationTap: _openCitation,
-            );
-          }
-
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 820),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: item,
-              ),
-            ),
-          );
-        },
-      ),
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 160),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.012),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: content,
     );
   }
 
@@ -131,28 +160,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
+        constraints: const BoxConstraints(maxWidth: 720),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Material 3 Hero Icon Container
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.psychology_outlined,
-                  size: 32,
-                  color: colorScheme.onPrimaryContainer,
-                ),
-              ),
-              const SizedBox(height: 24),
-
               // Main prompt headline
               RichText(
                 textAlign: TextAlign.center,
@@ -163,14 +176,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     letterSpacing: -0.3,
                   ),
                   children: [
-                    const TextSpan(text: 'What should we build in '),
+                    const TextSpan(text: 'What should we explore in '),
                     TextSpan(
                       text: collectionName,
                       style: TextStyle(
                         color: colorScheme.primary,
-                        decoration: TextDecoration.underline,
-                        decorationStyle: TextDecorationStyle.dotted,
-                        decorationColor: colorScheme.primary,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const TextSpan(text: '?'),
@@ -179,13 +190,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Ask questions, summarize key findings, or extract methodology with citations.',
+                'Ask questions, compare findings, and trace every answer back to your papers.',
                 style: textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               // Prompt suggestion chips
               Wrap(
@@ -229,9 +240,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return ActionChip(
       avatar: Icon(icon, size: 16, color: colorScheme.primary),
       label: Text(prompt),
-      shape: const StadiumBorder(),
-      backgroundColor: colorScheme.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      color: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.pressed)) {
+          return colorScheme.surfaceContainerHighest;
+        }
+        if (states.contains(WidgetState.hovered)) {
+          return colorScheme.surfaceContainerHigh;
+        }
+        return colorScheme.surfaceContainer;
+      }),
+      elevation: 0,
+      pressElevation: 0,
       side: BorderSide(color: colorScheme.outlineVariant),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       labelStyle: textTheme.bodySmall?.copyWith(
         color: colorScheme.onSurface,
         fontWeight: FontWeight.w500,
@@ -301,7 +323,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     )
                   else ...[
                     // Assistant Markdown Content with Clickable Citations
-                    _buildAssistantMarkdown(context, msg.content, msg.citations),
+                    _buildAssistantMarkdown(
+                      context,
+                      msg.content,
+                      msg.citations,
+                    ),
 
                     // Sources Bar if citations present
                     if (msg.citations.isNotEmpty) ...[
@@ -328,7 +354,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                               );
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: const Text('Response copied to clipboard'),
+                                  content: const Text(
+                                    'Response copied to clipboard',
+                                  ),
                                   behavior: SnackBarBehavior.floating,
                                   duration: const Duration(seconds: 1),
                                   shape: RoundedRectangleBorder(
@@ -453,7 +481,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         children: [
           Row(
             children: [
-              Icon(Icons.library_books_outlined, size: 14, color: colorScheme.primary),
+              Icon(
+                Icons.library_books_outlined,
+                size: 14,
+                color: colorScheme.primary,
+              ),
               const SizedBox(width: 6),
               Text(
                 'CITED SOURCES',
@@ -477,7 +509,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 avatar: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(4),
@@ -532,12 +567,13 @@ class _StreamingMessageBubble extends ConsumerWidget {
       chatControllerProvider.select((s) => s.streamingText ?? ''),
     );
     final sources = ref.watch(
-      chatControllerProvider.select(
-        (s) => s.streamingSources.values.toList(),
-      ),
+      chatControllerProvider.select((s) => s.streamingSources.values.toList()),
     );
 
-    ref.listen(chatControllerProvider.select((s) => s.streamingText), (prev, next) {
+    ref.listen(chatControllerProvider.select((s) => s.streamingText), (
+      prev,
+      next,
+    ) {
       if (next != null && next.isNotEmpty) {
         onScrollNeeded();
       }

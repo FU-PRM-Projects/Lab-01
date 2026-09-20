@@ -22,8 +22,14 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   SettingsNotifier(this._storage, AppSettings initial) : super(initial);
 
   Future<void> update(AppSettings newSettings) async {
-    await _storage.saveSettings(newSettings);
+    final previousSettings = state;
     state = newSettings;
+    try {
+      await _storage.saveSettings(newSettings);
+    } catch (_) {
+      state = previousSettings;
+      rethrow;
+    }
   }
 }
 

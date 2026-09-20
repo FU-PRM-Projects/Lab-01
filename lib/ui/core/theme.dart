@@ -9,24 +9,24 @@ class AppColors {
   static const Color info = Color(0xFF3B82F6);
 
   // Default seed color for Material 3 dynamic color generation
-  static const Color seedColor = Color(0xFF2563EB);
+  static const Color seedColor = Color(0xFF4B5563);
 
   // Backward compatibility colors (mapped to dark palette)
-  static const Color darkBg = Color(0xFF131316);
-  static const Color sidebarBg = Color(0xFF1A1A1E);
-  static const Color cardBg = Color(0xFF222227);
-  static const Color composerBg = Color(0xFF26262C);
-  static const Color border = Color(0xFF32323A);
-  static const Color borderSubtle = Color(0xFF2A2A32);
-  static const Color hover = Color(0xFF2E2E36);
-  static const Color selected = Color(0xFF383844);
+  static const Color darkBg = Color(0xFF171717);
+  static const Color sidebarBg = Color(0xFF202020);
+  static const Color cardBg = Color(0xFF242424);
+  static const Color composerBg = Color(0xFF292929);
+  static const Color border = Color(0xFF3A3A3A);
+  static const Color borderSubtle = Color(0xFF303030);
+  static const Color hover = Color(0xFF303030);
+  static const Color selected = Color(0xFF383838);
 
   static const Color textPrimary = Color(0xFFEDEDF2);
   static const Color textSecondary = Color(0xFFA1A1AC);
   static const Color textMuted = Color(0xFF71717E);
 
-  static const Color accentBlue = Color(0xFF3B82F6);
-  static const Color accentBlueHover = Color(0xFF2563EB);
+  static const Color accentBlue = Color(0xFF5B8DEF);
+  static const Color accentBlueHover = Color(0xFF4779D9);
   static const Color citationChip = Color(0xFF1E293B);
   static const Color citationChipBorder = Color(0xFF334155);
   static const Color citationChipText = Color(0xFF60A5FA);
@@ -34,66 +34,68 @@ class AppColors {
 
 /// Material 3 Dark Theme
 ThemeData buildDarkTheme() {
-  final colorScheme = ColorScheme.fromSeed(
-    seedColor: AppColors.seedColor,
-    brightness: Brightness.dark,
-  ).copyWith(
-    surface: const Color(0xFF131316),
-    surfaceDim: const Color(0xFF101013),
-    surfaceBright: const Color(0xFF35353C),
-    surfaceContainerLowest: const Color(0xFF0D0D10),
-    surfaceContainerLow: const Color(0xFF1A1A1E),
-    surfaceContainer: const Color(0xFF222227),
-    surfaceContainerHigh: const Color(0xFF2A2A31),
-    surfaceContainerHighest: const Color(0xFF33333C),
-    outline: const Color(0xFF52525E),
-    outlineVariant: const Color(0xFF33333C),
-    primary: const Color(0xFF60A5FA),
-    onPrimary: const Color(0xFF002F6C),
-    primaryContainer: const Color(0xFF1E3A8A),
-    onPrimaryContainer: const Color(0xFFDBEAFE),
-    secondary: const Color(0xFF93C5FD),
-    onSecondary: const Color(0xFF0C2D64),
-    secondaryContainer: const Color(0xFF25334E),
-    onSecondaryContainer: const Color(0xFFBFDBFE),
-    error: const Color(0xFFF87171),
-    onError: const Color(0xFF450A0A),
-    errorContainer: const Color(0xFF7F1D1D),
-    onErrorContainer: const Color(0xFFFECACA),
-  );
+  final colorScheme =
+      ColorScheme.fromSeed(
+        seedColor: AppColors.seedColor,
+        brightness: Brightness.dark,
+      ).copyWith(
+        surface: const Color(0xFF171717),
+        surfaceDim: const Color(0xFF121212),
+        surfaceBright: const Color(0xFF353535),
+        surfaceContainerLowest: const Color(0xFF101010),
+        surfaceContainerLow: const Color(0xFF1F1F1F),
+        surfaceContainer: const Color(0xFF242424),
+        surfaceContainerHigh: const Color(0xFF2B2B2B),
+        surfaceContainerHighest: const Color(0xFF353535),
+        outline: const Color(0xFF5A5A5A),
+        outlineVariant: const Color(0xFF393939),
+        primary: const Color(0xFFF2F2F2),
+        onPrimary: const Color(0xFF1A1A1A),
+        primaryContainer: const Color(0xFF343434),
+        onPrimaryContainer: const Color(0xFFF4F4F4),
+        secondary: const Color(0xFFCACACA),
+        onSecondary: const Color(0xFF262626),
+        secondaryContainer: const Color(0xFF353535),
+        onSecondaryContainer: const Color(0xFFF0F0F0),
+        error: const Color(0xFFF87171),
+        onError: const Color(0xFF450A0A),
+        errorContainer: const Color(0xFF7F1D1D),
+        onErrorContainer: const Color(0xFFFECACA),
+      );
 
   return _buildTheme(colorScheme);
 }
 
 /// Material 3 Light Theme
 ThemeData buildLightTheme() {
-  final colorScheme = ColorScheme.fromSeed(
-    seedColor: AppColors.seedColor,
-    brightness: Brightness.light,
-  ).copyWith(
-    surface: const Color(0xFFF8FAFC),
-    surfaceDim: const Color(0xFFEDEFEF),
-    surfaceBright: Colors.white,
-    surfaceContainerLowest: Colors.white,
-    surfaceContainerLow: const Color(0xFFF1F5F9),
-    surfaceContainer: const Color(0xFFE2E8F0),
-    surfaceContainerHigh: const Color(0xFFCBD5E1),
-    surfaceContainerHighest: const Color(0xFF94A3B8),
-    outline: const Color(0xFF94A3B8),
-    outlineVariant: const Color(0xFFE2E8F0),
-    primary: const Color(0xFF2563EB),
-    onPrimary: Colors.white,
-    primaryContainer: const Color(0xFFDBEAFE),
-    onPrimaryContainer: const Color(0xFF1E3A8A),
-    secondary: const Color(0xFF3B82F6),
-    onSecondary: Colors.white,
-    secondaryContainer: const Color(0xFFEFF6FF),
-    onSecondaryContainer: const Color(0xFF1D4ED8),
-    error: const Color(0xFFDC2626),
-    onError: Colors.white,
-    errorContainer: const Color(0xFFFEE2E2),
-    onErrorContainer: const Color(0xFF991B1B),
-  );
+  final colorScheme =
+      ColorScheme.fromSeed(
+        seedColor: AppColors.seedColor,
+        brightness: Brightness.light,
+      ).copyWith(
+        surface: const Color(0xFFFFFFFF),
+        surfaceDim: const Color(0xFFEFEFEF),
+        surfaceBright: const Color(0xFFFFFFFF),
+        surfaceContainerLowest: Colors.white,
+        surfaceContainerLow: const Color(0xFFF5F5F5),
+        surfaceContainer: const Color(0xFFF0F0F0),
+        surfaceContainerHigh: const Color(0xFFEAEAEA),
+        surfaceContainerHighest: const Color(0xFFE2E2E2),
+        outline: const Color(0xFF9A9A9A),
+        outlineVariant: const Color(0xFFE1E1E1),
+        primary: const Color(0xFF202020),
+        onPrimary: Colors.white,
+        primaryContainer: const Color(0xFFE8E8E8),
+        onPrimaryContainer: const Color(0xFF202020),
+        secondary: const Color(0xFF5E5E5E),
+        onSecondary: Colors.white,
+        secondaryContainer: const Color(0xFFE9E9E9),
+        onSecondaryContainer: const Color(0xFF242424),
+        error: const Color(0xFFDC2626),
+        onError: Colors.white,
+        errorContainer: const Color(0xFFFEE2E2),
+        onErrorContainer: const Color(0xFF991B1B),
+      );
 
   return _buildTheme(colorScheme);
 }
@@ -121,10 +123,7 @@ ThemeData _buildTheme(ColorScheme colorScheme) {
         fontWeight: FontWeight.w600,
         color: colorScheme.onSurface,
       ),
-      iconTheme: IconThemeData(
-        color: colorScheme.onSurfaceVariant,
-        size: 18,
-      ),
+      iconTheme: IconThemeData(color: colorScheme.onSurfaceVariant, size: 18),
     ),
 
     // Card Theme
@@ -134,10 +133,7 @@ ThemeData _buildTheme(ColorScheme colorScheme) {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: colorScheme.outlineVariant,
-          width: 1,
-        ),
+        side: BorderSide(color: colorScheme.outlineVariant, width: 1),
       ),
     ),
 
@@ -147,10 +143,7 @@ ThemeData _buildTheme(ColorScheme colorScheme) {
       elevation: 6,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(28),
-        side: BorderSide(
-          color: colorScheme.outlineVariant,
-          width: 1,
-        ),
+        side: BorderSide(color: colorScheme.outlineVariant, width: 1),
       ),
       titleTextStyle: TextStyle(
         fontFamily: 'Segoe UI',
@@ -240,9 +233,7 @@ ThemeData _buildTheme(ColorScheme colorScheme) {
         color: colorScheme.onSecondaryContainer,
       ),
       side: BorderSide(color: colorScheme.outlineVariant, width: 1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     ),
 
     // Segmented Button Theme
@@ -272,10 +263,7 @@ ThemeData _buildTheme(ColorScheme colorScheme) {
         color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
         fontSize: 13,
       ),
-      labelStyle: TextStyle(
-        color: colorScheme.onSurfaceVariant,
-        fontSize: 13,
-      ),
+      labelStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: colorScheme.outlineVariant),
