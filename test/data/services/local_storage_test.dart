@@ -157,5 +157,64 @@ void main() {
         isEmpty,
       );
     });
+    test('Legacy TVEC index is retired and its papers marked for re-import',
+        () async {
+      final collection = Collection(
+        id: 'col_legacy',
+        name: 'Legacy',
+        createdAt: DateTime.utc(2026),
+        embeddingProfile: const EmbeddingProfile(id: 'profile_1'),
+      );
+      await storage.saveCollection(collection);
+
+      PaperDocument paper(String id, DocumentStatus status) => PaperDocument(
+        id: id,
+        fileName: '$id.pdf',
+        title: id,
+        sha256: 'hash_$id',
+        pageCount: 1,
+        status: status,
+        createdAt: DateTime.utc(2026),
+        embeddingProfileId: 'profile_1',
+      );
+
+      await storage.savePaper('col_legacy', paper('doc_ready', DocumentStatus.ready));
+      await storage.savePaper('col_legacy', paper('doc_failed', DocumentStatus.failed));
+
+      final legacyVectors = File(storage.legacyIndexVectorsPath('col_legacy'));
+      legacyVectors.parent.createSync(recursive: true);
+      legacyVectors.writeAsBytesSync([0x54, 0x56, 0x45, 0x43]);
+      await storage.writeJsonSafely(
+        storage.legacyIndexStatePath('col_legacy'),
+        {'status': 'clean'},
+      );
+
+      await storage.runStartupRecovery();
+
+      expect(legacyVectors.existsSync(), isFalse);
+      expect(File(storage.legacyIndexStatePath('col_legacy')).existsSync(), isFalse);
+
+      final reloaded = await storage.listPapers('col_legacy');
+      final ready = reloaded.firstWhere((p) => p.id == 'doc_ready');
+      final failed = reloaded.firstWhere((p) => p.id == 'doc_failed');
+      expect(ready.status, equals(DocumentStatus.needsReindex));
+      expect(ready.error, contains('Re-import'));
+      expect(failed.status, equals(DocumentStatus.failed));
+
+      // Idempotent: a second pass leaves the marked paper alone.
+      await storage.runStartupRecovery();
+      final again = await storage.listPapers('col_legacy');
+      expect(
+        again.firstWhere((p) => p.id == 'doc_ready').status,
+        equals(DocumentStatus.needsReindex),
+      );
+    });
+
+    test('lanceDbDir resolves inside the collection index directory', () {
+      expect(
+        storage.lanceDbDir('col_1'),
+        equals('${storage.indexDir('col_1')}${Platform.pathSeparator}lance'),
+      );
+    });
   });
 }

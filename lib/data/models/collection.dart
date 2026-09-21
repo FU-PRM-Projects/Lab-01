@@ -39,7 +39,6 @@ class Collection {
   final String id;
   final String name;
   final DateTime createdAt;
-  final int nextVectorId;
   final EmbeddingProfile embeddingProfile;
 
   const Collection({
@@ -47,13 +46,11 @@ class Collection {
     required this.id,
     required this.name,
     required this.createdAt,
-    this.nextVectorId = 1,
     required this.embeddingProfile,
   });
 
   Collection copyWith({
     String? name,
-    int? nextVectorId,
     EmbeddingProfile? embeddingProfile,
   }) {
     return Collection(
@@ -61,7 +58,6 @@ class Collection {
       id: id,
       name: name ?? this.name,
       createdAt: createdAt,
-      nextVectorId: nextVectorId ?? this.nextVectorId,
       embeddingProfile: embeddingProfile ?? this.embeddingProfile,
     );
   }
@@ -74,7 +70,6 @@ class Collection {
       createdAt:
           DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),
-      nextVectorId: json['nextVectorId'] as int? ?? 1,
       embeddingProfile: json['embeddingProfile'] != null
           ? EmbeddingProfile.fromJson(
               json['embeddingProfile'] as Map<String, dynamic>,
@@ -89,7 +84,6 @@ class Collection {
       'id': id,
       'name': name,
       'createdAt': createdAt.toUtc().toIso8601String(),
-      'nextVectorId': nextVectorId,
       'embeddingProfile': embeddingProfile.toJson(),
     };
   }

@@ -3,7 +3,6 @@ import 'package:lab_05/data/models/app_settings.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
-import 'package:lab_05/data/services/collection_index.dart';
 import 'package:lab_05/data/repositories/paper_repository.dart';
 import 'package:lab_05/data/models/chat.dart';
 import 'package:lab_05/data/models/citation.dart';
@@ -126,14 +125,12 @@ class PapersNotifier extends StateNotifier<List<PaperDocument>> {
     if (mounted) state = List.unmodifiable(papers);
   }
 
-  Future<void> removePaper(
-    String documentId,
-    List<int> vectorIds,
-    CollectionIndex index,
-  ) async {
+  /// Forgets a paper's metadata and PDF.
+  ///
+  /// Any rows it still owns in the vector store are swept the next time the
+  /// collection is opened, because that sweep keeps only ready documents.
+  Future<void> removePaper(String documentId) async {
     if (_collectionId == null) return;
-    await index.removeVectors(vectorIds);
-    await index.save(_storage.indexVectorsPath(_collectionId));
     await _storage.deletePaper(_collectionId, documentId);
     await refresh();
   }

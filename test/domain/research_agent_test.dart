@@ -31,18 +31,6 @@ void main() {
         status: DocumentStatus.ready,
         createdAt: DateTime.utc(2026),
         embeddingProfileId: 'test',
-        chunks: const [
-          PaperChunk(
-            id: 'doc_test:p1:c0',
-            vectorId: 1,
-            page: 1,
-            ordinal: 0,
-            section: 'Results',
-            startChar: 0,
-            endChar: 13,
-            text: 'Exact evidence',
-          ),
-        ],
       ),
     );
   });
@@ -255,11 +243,36 @@ class _Embeddings extends EmbeddingClient {
   }
 }
 
+/// The chunk the store returns for every query in these tests. Chunk text now
+/// lives in the vector store rather than the paper's metadata JSON, so the fake
+/// supplies it directly.
+const _evidenceChunk = PaperChunk(
+  id: 'doc_test:p1:c0',
+  documentId: 'doc_test',
+  page: 1,
+  ordinal: 0,
+  section: 'Results',
+  startChar: 0,
+  endChar: 13,
+  text: 'Exact evidence',
+);
+
 class _Index extends CollectionIndex {
+  // retrieve() skips the embedding call on an empty store, so the fake has to
+  // look non-empty.
   @override
-  Future<List<SearchResult>> search(
-    List<double> query, {
-    int topK = 15,
-    List<int>? allowlist,
-  }) async => [const SearchResult(vectorId: 1, score: 1)];
+  int get length => 1;
+
+  @override
+  Future<List<ChunkHit>> search(List<double> query, {int topK = 15}) async => [
+    const ChunkHit(chunk: _evidenceChunk, score: 1),
+  ];
+
+  @override
+  Future<List<PaperChunk>> chunksForPage(
+    String documentId,
+    int page, {
+    int limit = 4,
+  }) async =>
+      documentId == 'doc_test' && page == 1 ? [_evidenceChunk] : [];
 }

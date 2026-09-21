@@ -42,7 +42,6 @@ class PdfProcessor {
     final chunks = rustResult.chunks.map((rc) {
       return PaperChunk(
         id: rc.id,
-        vectorId: rc.vectorId,
         page: rc.page,
         ordinal: rc.ordinal,
         section: rc.section,

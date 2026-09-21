@@ -79,9 +79,7 @@ class ResearchAgent {
       if (_isCancelled) return;
       yield ToolStatus('Searching papers for relevant passages...');
       final chunks = await retrieve(
-        collectionId,
         userQuestion,
-        storage: storage,
         embeddings: embeddings,
         index: index,
       );
@@ -162,7 +160,7 @@ $initialEvidence
             toolsUsed++;
             yield ToolStatus('Executing ${call.name}...');
             try {
-              result = await _executeTool(call, collectionId, evidence);
+              result = await _executeTool(call, evidence);
             } catch (error) {
               result = 'Tool failed: $error';
             }
@@ -191,7 +189,6 @@ $initialEvidence
 
   Future<String> _executeTool(
     AIChatMessageToolCall call,
-    String collectionId,
     _Evidence evidence,
   ) async {
     switch (call.name) {
@@ -201,9 +198,7 @@ $initialEvidence
           return 'A non-empty query is required.';
         }
         final chunks = await retrieve(
-          collectionId,
           query,
-          storage: storage,
           embeddings: embeddings,
           index: index,
           finalLimit: 4,
@@ -223,7 +218,7 @@ $initialEvidence
           return 'Page is outside this document.';
         }
         return evidence.register(
-          paper.chunks.where((chunk) => chunk.page == page).take(4),
+          await index.chunksForPage(documentId, page, limit: 4),
         );
       case 'list_papers':
         return evidence.papers.values
@@ -294,7 +289,10 @@ class _Evidence {
     final result = StringBuffer();
     for (final chunk in chunks) {
       final paper = papers[chunk.parentDocId];
-      if (paper == null) continue;
+      // Only ready papers may be cited. The store is swept to hold rows for
+      // ready documents only, but this keeps a stale row from ever becoming a
+      // citation if that sweep could not run.
+      if (paper == null || paper.status != DocumentStatus.ready) continue;
       final id = _chunkIds.putIfAbsent(
         chunk.id,
         () => 'S${_chunkIds.length + 1}',

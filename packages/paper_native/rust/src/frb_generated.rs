@@ -27,7 +27,7 @@
 
 // Section: imports
 
-use crate::api::vector_index::*;
+use crate::api::lance_store::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
 use flutter_rust_bridge::{Handler, IntoIntoDart};
@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1922943509;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -2114872438;
 
 // Section: executor
 
@@ -48,7 +48,7 @@ flutter_rust_bridge::frb_generated_default_handler!();
 
 // Section: wire_funcs
 
-fn wire__crate__api__vector_index__NativeVectorIndex_add_batch_impl(
+fn wire__crate__api__lance_store__NativeChunkStore_add_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -56,7 +56,7 @@ fn wire__crate__api__vector_index__NativeVectorIndex_add_batch_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "NativeVectorIndex_add_batch",
+            debug_name: "NativeChunkStore_add",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -71,11 +71,11 @@ fn wire__crate__api__vector_index__NativeVectorIndex_add_batch_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>,
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>,
             >>::sse_decode(&mut deserializer);
-            let api_ids = <Vec<u64>>::sse_decode(&mut deserializer);
+            let api_rows =
+                <Vec<crate::api::lance_store::RustChunkRow>>::sse_decode(&mut deserializer);
             let api_vectors = <Vec<f32>>::sse_decode(&mut deserializer);
-            let api_dim = <usize>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -93,11 +93,10 @@ fn wire__crate__api__vector_index__NativeVectorIndex_add_batch_impl(
                         }
                     }
                     let api_that_guard = api_that_guard.unwrap();
-                    let output_ok = crate::api::vector_index::NativeVectorIndex::add_batch(
+                    let output_ok = crate::api::lance_store::NativeChunkStore::add(
                         &*api_that_guard,
-                        api_ids,
+                        api_rows,
                         api_vectors,
-                        api_dim,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -105,7 +104,7 @@ fn wire__crate__api__vector_index__NativeVectorIndex_add_batch_impl(
         },
     )
 }
-fn wire__crate__api__vector_index__NativeVectorIndex_dim_impl(
+fn wire__crate__api__lance_store__NativeChunkStore_compact_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -113,7 +112,7 @@ fn wire__crate__api__vector_index__NativeVectorIndex_dim_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "NativeVectorIndex_dim",
+            debug_name: "NativeChunkStore_compact",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -128,7 +127,7 @@ fn wire__crate__api__vector_index__NativeVectorIndex_dim_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>,
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>,
             >>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
@@ -148,14 +147,14 @@ fn wire__crate__api__vector_index__NativeVectorIndex_dim_impl(
                     }
                     let api_that_guard = api_that_guard.unwrap();
                     let output_ok =
-                        crate::api::vector_index::NativeVectorIndex::dim(&*api_that_guard)?;
+                        crate::api::lance_store::NativeChunkStore::compact(&*api_that_guard)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
         },
     )
 }
-fn wire__crate__api__vector_index__NativeVectorIndex_len_impl(
+fn wire__crate__api__lance_store__NativeChunkStore_count_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -163,7 +162,7 @@ fn wire__crate__api__vector_index__NativeVectorIndex_len_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "NativeVectorIndex_len",
+            debug_name: "NativeChunkStore_count",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -178,7 +177,7 @@ fn wire__crate__api__vector_index__NativeVectorIndex_len_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>,
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>,
             >>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
@@ -198,14 +197,14 @@ fn wire__crate__api__vector_index__NativeVectorIndex_len_impl(
                     }
                     let api_that_guard = api_that_guard.unwrap();
                     let output_ok =
-                        crate::api::vector_index::NativeVectorIndex::len(&*api_that_guard)?;
+                        crate::api::lance_store::NativeChunkStore::count(&*api_that_guard)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
         },
     )
 }
-fn wire__crate__api__vector_index__NativeVectorIndex_load_impl(
+fn wire__crate__api__lance_store__NativeChunkStore_delete_doc_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -213,7 +212,7 @@ fn wire__crate__api__vector_index__NativeVectorIndex_load_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "NativeVectorIndex_load",
+            debug_name: "NativeChunkStore_delete_doc",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -227,18 +226,38 @@ fn wire__crate__api__vector_index__NativeVectorIndex_load_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_path = <String>::sse_decode(&mut deserializer);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>,
+            >>::sse_decode(&mut deserializer);
+            let api_doc_id = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
-                    let output_ok = crate::api::vector_index::NativeVectorIndex::load(api_path)?;
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = crate::api::lance_store::NativeChunkStore::delete_doc(
+                        &*api_that_guard,
+                        api_doc_id,
+                    )?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
         },
     )
 }
-fn wire__crate__api__vector_index__NativeVectorIndex_new_impl(
+fn wire__crate__api__lance_store__NativeChunkStore_dim_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -246,7 +265,7 @@ fn wire__crate__api__vector_index__NativeVectorIndex_new_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "NativeVectorIndex_new",
+            debug_name: "NativeChunkStore_dim",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -260,14 +279,28 @@ fn wire__crate__api__vector_index__NativeVectorIndex_new_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_dim = <usize>::sse_decode(&mut deserializer);
-            let api_bit_width = <usize>::sse_decode(&mut deserializer);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>,
+            >>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, ()>((move || {
-                    let output_ok = Ok::<_, ()>(crate::api::vector_index::NativeVectorIndex::new(
-                        api_dim,
-                        api_bit_width,
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = Ok::<_, ()>(crate::api::lance_store::NativeChunkStore::dim(
+                        &*api_that_guard,
                     ))?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -275,7 +308,7 @@ fn wire__crate__api__vector_index__NativeVectorIndex_new_impl(
         },
     )
 }
-fn wire__crate__api__vector_index__NativeVectorIndex_remove_impl(
+fn wire__crate__api__lance_store__NativeChunkStore_doc_ids_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -283,7 +316,7 @@ fn wire__crate__api__vector_index__NativeVectorIndex_remove_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "NativeVectorIndex_remove",
+            debug_name: "NativeChunkStore_doc_ids",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -298,9 +331,8 @@ fn wire__crate__api__vector_index__NativeVectorIndex_remove_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>,
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>,
             >>::sse_decode(&mut deserializer);
-            let api_id = <u64>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -318,17 +350,15 @@ fn wire__crate__api__vector_index__NativeVectorIndex_remove_impl(
                         }
                     }
                     let api_that_guard = api_that_guard.unwrap();
-                    let output_ok = crate::api::vector_index::NativeVectorIndex::remove(
-                        &*api_that_guard,
-                        api_id,
-                    )?;
+                    let output_ok =
+                        crate::api::lance_store::NativeChunkStore::doc_ids(&*api_that_guard)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
         },
     )
 }
-fn wire__crate__api__vector_index__NativeVectorIndex_search_impl(
+fn wire__crate__api__lance_store__NativeChunkStore_open_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -336,7 +366,42 @@ fn wire__crate__api__vector_index__NativeVectorIndex_search_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "NativeVectorIndex_search",
+            debug_name: "NativeChunkStore_open",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_path = <String>::sse_decode(&mut deserializer);
+            let api_dim = <usize>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok =
+                        crate::api::lance_store::NativeChunkStore::open(api_path, api_dim)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__lance_store__NativeChunkStore_page_chunks_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "NativeChunkStore_page_chunks",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -351,11 +416,120 @@ fn wire__crate__api__vector_index__NativeVectorIndex_search_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>,
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>,
+            >>::sse_decode(&mut deserializer);
+            let api_doc_id = <String>::sse_decode(&mut deserializer);
+            let api_page = <i32>::sse_decode(&mut deserializer);
+            let api_limit = <usize>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = crate::api::lance_store::NativeChunkStore::page_chunks(
+                        &*api_that_guard,
+                        api_doc_id,
+                        api_page,
+                        api_limit,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__lance_store__NativeChunkStore_retain_docs_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "NativeChunkStore_retain_docs",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>,
+            >>::sse_decode(&mut deserializer);
+            let api_doc_ids = <Vec<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = crate::api::lance_store::NativeChunkStore::retain_docs(
+                        &*api_that_guard,
+                        api_doc_ids,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__lance_store__NativeChunkStore_search_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "NativeChunkStore_search",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>,
             >>::sse_decode(&mut deserializer);
             let api_query = <Vec<f32>>::sse_decode(&mut deserializer);
             let api_k = <usize>::sse_decode(&mut deserializer);
-            let api_allowlist = <Option<Vec<u64>>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -373,64 +547,10 @@ fn wire__crate__api__vector_index__NativeVectorIndex_search_impl(
                         }
                     }
                     let api_that_guard = api_that_guard.unwrap();
-                    let output_ok = crate::api::vector_index::NativeVectorIndex::search(
+                    let output_ok = crate::api::lance_store::NativeChunkStore::search(
                         &*api_that_guard,
                         api_query,
                         api_k,
-                        api_allowlist,
-                    )?;
-                    std::result::Result::Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__vector_index__NativeVectorIndex_write_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "NativeVectorIndex_write",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>,
-            >>::sse_decode(&mut deserializer);
-            let api_path = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, String>((move || {
-                    let mut api_that_guard = None;
-                    let decode_indices_ =
-                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
-                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                &api_that, 0, false,
-                            ),
-                        ]);
-                    for i in decode_indices_ {
-                        match i {
-                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
-                            _ => unreachable!(),
-                        }
-                    }
-                    let api_that_guard = api_that_guard.unwrap();
-                    let output_ok = crate::api::vector_index::NativeVectorIndex::write(
-                        &*api_that_guard,
-                        api_path,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -558,23 +678,23 @@ fn wire__crate__api__pdf_parser__parse_pdf_impl(
 // Section: related_funcs
 
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
-    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>
+    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>
 );
 
 // Section: dart2rust
 
-impl SseDecode for NativeVectorIndex {
+impl SseDecode for NativeChunkStore {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <RustOpaqueMoi<
-            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>,
+            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>,
         >>::sse_decode(deserializer);
         return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
     }
 }
 
 impl SseDecode
-    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>>
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -588,13 +708,6 @@ impl SseDecode for String {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <Vec<u8>>::sse_decode(deserializer);
         return String::from_utf8(inner).unwrap();
-    }
-}
-
-impl SseDecode for bool {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        deserializer.cursor.read_u8().unwrap() != 0
     }
 }
 
@@ -612,20 +725,13 @@ impl SseDecode for i32 {
     }
 }
 
-impl SseDecode for i64 {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        deserializer.cursor.read_i64::<NativeEndian>().unwrap()
-    }
-}
-
-impl SseDecode for Vec<u64> {
+impl SseDecode for Vec<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut len_ = <i32>::sse_decode(deserializer);
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
-            ans_.push(<u64>::sse_decode(deserializer));
+            ans_.push(<String>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -667,13 +773,13 @@ impl SseDecode for Vec<u8> {
     }
 }
 
-impl SseDecode for Vec<crate::api::pdf_parser::RustPaperChunk> {
+impl SseDecode for Vec<crate::api::lance_store::RustChunkHit> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut len_ = <i32>::sse_decode(deserializer);
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
-            ans_.push(<crate::api::pdf_parser::RustPaperChunk>::sse_decode(
+            ans_.push(<crate::api::lance_store::RustChunkHit>::sse_decode(
                 deserializer,
             ));
         }
@@ -681,13 +787,27 @@ impl SseDecode for Vec<crate::api::pdf_parser::RustPaperChunk> {
     }
 }
 
-impl SseDecode for Vec<crate::api::vector_index::RustSearchResult> {
+impl SseDecode for Vec<crate::api::lance_store::RustChunkRow> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut len_ = <i32>::sse_decode(deserializer);
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
-            ans_.push(<crate::api::vector_index::RustSearchResult>::sse_decode(
+            ans_.push(<crate::api::lance_store::RustChunkRow>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::pdf_parser::RustPaperChunk> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::pdf_parser::RustPaperChunk>::sse_decode(
                 deserializer,
             ));
         }
@@ -706,14 +826,39 @@ impl SseDecode for Option<String> {
     }
 }
 
-impl SseDecode for Option<Vec<u64>> {
+impl SseDecode for crate::api::lance_store::RustChunkHit {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        if (<bool>::sse_decode(deserializer)) {
-            return Some(<Vec<u64>>::sse_decode(deserializer));
-        } else {
-            return None;
-        }
+        let mut var_row = <crate::api::lance_store::RustChunkRow>::sse_decode(deserializer);
+        let mut var_score = <f32>::sse_decode(deserializer);
+        return crate::api::lance_store::RustChunkHit {
+            row: var_row,
+            score: var_score,
+        };
+    }
+}
+
+impl SseDecode for crate::api::lance_store::RustChunkRow {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_chunkId = <String>::sse_decode(deserializer);
+        let mut var_docId = <String>::sse_decode(deserializer);
+        let mut var_page = <i32>::sse_decode(deserializer);
+        let mut var_ordinal = <i32>::sse_decode(deserializer);
+        let mut var_section = <String>::sse_decode(deserializer);
+        let mut var_startChar = <i32>::sse_decode(deserializer);
+        let mut var_endChar = <i32>::sse_decode(deserializer);
+        let mut var_text = <String>::sse_decode(deserializer);
+        return crate::api::lance_store::RustChunkRow {
+            chunk_id: var_chunkId,
+            doc_id: var_docId,
+            page: var_page,
+            ordinal: var_ordinal,
+            section: var_section,
+            start_char: var_startChar,
+            end_char: var_endChar,
+            text: var_text,
+        };
     }
 }
 
@@ -721,7 +866,6 @@ impl SseDecode for crate::api::pdf_parser::RustPaperChunk {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_id = <String>::sse_decode(deserializer);
-        let mut var_vectorId = <i64>::sse_decode(deserializer);
         let mut var_page = <i32>::sse_decode(deserializer);
         let mut var_ordinal = <i32>::sse_decode(deserializer);
         let mut var_section = <String>::sse_decode(deserializer);
@@ -730,7 +874,6 @@ impl SseDecode for crate::api::pdf_parser::RustPaperChunk {
         let mut var_text = <String>::sse_decode(deserializer);
         return crate::api::pdf_parser::RustPaperChunk {
             id: var_id,
-            vector_id: var_vectorId,
             page: var_page,
             ordinal: var_ordinal,
             section: var_section,
@@ -762,25 +905,6 @@ impl SseDecode for crate::api::pdf_parser::RustPdfProcessedResult {
     }
 }
 
-impl SseDecode for crate::api::vector_index::RustSearchResult {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_vectorId = <u64>::sse_decode(deserializer);
-        let mut var_score = <f32>::sse_decode(deserializer);
-        return crate::api::vector_index::RustSearchResult {
-            vector_id: var_vectorId,
-            score: var_score,
-        };
-    }
-}
-
-impl SseDecode for u64 {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        deserializer.cursor.read_u64::<NativeEndian>().unwrap()
-    }
-}
-
 impl SseDecode for u8 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -800,6 +924,13 @@ impl SseDecode for usize {
     }
 }
 
+impl SseDecode for bool {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u8().unwrap() != 0
+    }
+}
+
 fn pde_ffi_dispatcher_primary_impl(
     func_id: i32,
     port: flutter_rust_bridge::for_generated::MessagePort,
@@ -809,57 +940,69 @@ fn pde_ffi_dispatcher_primary_impl(
 ) {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        1 => wire__crate__api__vector_index__NativeVectorIndex_add_batch_impl(
+        1 => wire__crate__api__lance_store__NativeChunkStore_add_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        2 => wire__crate__api__vector_index__NativeVectorIndex_dim_impl(
+        2 => wire__crate__api__lance_store__NativeChunkStore_compact_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        3 => wire__crate__api__vector_index__NativeVectorIndex_len_impl(
+        3 => wire__crate__api__lance_store__NativeChunkStore_count_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        4 => wire__crate__api__vector_index__NativeVectorIndex_load_impl(
+        4 => wire__crate__api__lance_store__NativeChunkStore_delete_doc_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        5 => wire__crate__api__vector_index__NativeVectorIndex_new_impl(
+        5 => wire__crate__api__lance_store__NativeChunkStore_dim_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        6 => wire__crate__api__vector_index__NativeVectorIndex_remove_impl(
+        6 => wire__crate__api__lance_store__NativeChunkStore_doc_ids_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        7 => wire__crate__api__vector_index__NativeVectorIndex_search_impl(
+        7 => wire__crate__api__lance_store__NativeChunkStore_open_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        8 => wire__crate__api__vector_index__NativeVectorIndex_write_impl(
+        8 => wire__crate__api__lance_store__NativeChunkStore_page_chunks_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        9 => wire__crate__api__pdf_parser__chunk_text_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__init_app_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__pdf_parser__parse_pdf_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__lance_store__NativeChunkStore_retain_docs_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        10 => wire__crate__api__lance_store__NativeChunkStore_search_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        11 => wire__crate__api__pdf_parser__chunk_text_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__init_app_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__pdf_parser__parse_pdf_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -879,26 +1022,73 @@ fn pde_ffi_dispatcher_sync_impl(
 // Section: rust2dart
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for FrbWrapper<NativeVectorIndex> {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<NativeChunkStore> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
             .into_dart()
     }
 }
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<NativeVectorIndex> {}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<NativeChunkStore> {}
 
-impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<NativeVectorIndex>> for NativeVectorIndex {
-    fn into_into_dart(self) -> FrbWrapper<NativeVectorIndex> {
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<NativeChunkStore>> for NativeChunkStore {
+    fn into_into_dart(self) -> FrbWrapper<NativeChunkStore> {
         self.into()
     }
 }
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::lance_store::RustChunkHit {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.row.into_into_dart().into_dart(),
+            self.score.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::lance_store::RustChunkHit
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::lance_store::RustChunkHit>
+    for crate::api::lance_store::RustChunkHit
+{
+    fn into_into_dart(self) -> crate::api::lance_store::RustChunkHit {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::lance_store::RustChunkRow {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.chunk_id.into_into_dart().into_dart(),
+            self.doc_id.into_into_dart().into_dart(),
+            self.page.into_into_dart().into_dart(),
+            self.ordinal.into_into_dart().into_dart(),
+            self.section.into_into_dart().into_dart(),
+            self.start_char.into_into_dart().into_dart(),
+            self.end_char.into_into_dart().into_dart(),
+            self.text.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::lance_store::RustChunkRow
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::lance_store::RustChunkRow>
+    for crate::api::lance_store::RustChunkRow
+{
+    fn into_into_dart(self) -> crate::api::lance_store::RustChunkRow {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::pdf_parser::RustPaperChunk {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.id.into_into_dart().into_dart(),
-            self.vector_id.into_into_dart().into_dart(),
             self.page.into_into_dart().into_dart(),
             self.ordinal.into_into_dart().into_dart(),
             self.section.into_into_dart().into_dart(),
@@ -945,37 +1135,16 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::pdf_parser::RustPdfProcessedR
         self
     }
 }
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vector_index::RustSearchResult {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.vector_id.into_into_dart().into_dart(),
-            self.score.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::vector_index::RustSearchResult
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vector_index::RustSearchResult>
-    for crate::api::vector_index::RustSearchResult
-{
-    fn into_into_dart(self) -> crate::api::vector_index::RustSearchResult {
-        self
-    }
-}
 
-impl SseEncode for NativeVectorIndex {
+impl SseEncode for NativeChunkStore {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
     }
 }
 
 impl SseEncode
-    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>>
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -989,13 +1158,6 @@ impl SseEncode for String {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <Vec<u8>>::sse_encode(self.into_bytes(), serializer);
-    }
-}
-
-impl SseEncode for bool {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        serializer.cursor.write_u8(self as _).unwrap();
     }
 }
 
@@ -1013,19 +1175,12 @@ impl SseEncode for i32 {
     }
 }
 
-impl SseEncode for i64 {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        serializer.cursor.write_i64::<NativeEndian>(self).unwrap();
-    }
-}
-
-impl SseEncode for Vec<u64> {
+impl SseEncode for Vec<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
-            <u64>::sse_encode(item, serializer);
+            <String>::sse_encode(item, serializer);
         }
     }
 }
@@ -1060,22 +1215,32 @@ impl SseEncode for Vec<u8> {
     }
 }
 
+impl SseEncode for Vec<crate::api::lance_store::RustChunkHit> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::lance_store::RustChunkHit>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::lance_store::RustChunkRow> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::lance_store::RustChunkRow>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::pdf_parser::RustPaperChunk> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::pdf_parser::RustPaperChunk>::sse_encode(item, serializer);
-        }
-    }
-}
-
-impl SseEncode for Vec<crate::api::vector_index::RustSearchResult> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <i32>::sse_encode(self.len() as _, serializer);
-        for item in self {
-            <crate::api::vector_index::RustSearchResult>::sse_encode(item, serializer);
         }
     }
 }
@@ -1090,13 +1255,25 @@ impl SseEncode for Option<String> {
     }
 }
 
-impl SseEncode for Option<Vec<u64>> {
+impl SseEncode for crate::api::lance_store::RustChunkHit {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
-            <Vec<u64>>::sse_encode(value, serializer);
-        }
+        <crate::api::lance_store::RustChunkRow>::sse_encode(self.row, serializer);
+        <f32>::sse_encode(self.score, serializer);
+    }
+}
+
+impl SseEncode for crate::api::lance_store::RustChunkRow {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.chunk_id, serializer);
+        <String>::sse_encode(self.doc_id, serializer);
+        <i32>::sse_encode(self.page, serializer);
+        <i32>::sse_encode(self.ordinal, serializer);
+        <String>::sse_encode(self.section, serializer);
+        <i32>::sse_encode(self.start_char, serializer);
+        <i32>::sse_encode(self.end_char, serializer);
+        <String>::sse_encode(self.text, serializer);
     }
 }
 
@@ -1104,7 +1281,6 @@ impl SseEncode for crate::api::pdf_parser::RustPaperChunk {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.id, serializer);
-        <i64>::sse_encode(self.vector_id, serializer);
         <i32>::sse_encode(self.page, serializer);
         <i32>::sse_encode(self.ordinal, serializer);
         <String>::sse_encode(self.section, serializer);
@@ -1123,21 +1299,6 @@ impl SseEncode for crate::api::pdf_parser::RustPdfProcessedResult {
         <Vec<i32>>::sse_encode(self.empty_pages, serializer);
         <String>::sse_encode(self.pdf_type, serializer);
         <Vec<i32>>::sse_encode(self.needs_ocr_pages, serializer);
-    }
-}
-
-impl SseEncode for crate::api::vector_index::RustSearchResult {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <u64>::sse_encode(self.vector_id, serializer);
-        <f32>::sse_encode(self.score, serializer);
-    }
-}
-
-impl SseEncode for u64 {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        serializer.cursor.write_u64::<NativeEndian>(self).unwrap();
     }
 }
 
@@ -1163,6 +1324,13 @@ impl SseEncode for usize {
     }
 }
 
+impl SseEncode for bool {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u8(self as _).unwrap();
+    }
+}
+
 #[cfg(not(target_family = "wasm"))]
 mod io {
     // This file is automatically generated, so please do not edit it.
@@ -1171,7 +1339,7 @@ mod io {
     // Section: imports
 
     use super::*;
-    use crate::api::vector_index::*;
+    use crate::api::lance_store::*;
     use flutter_rust_bridge::for_generated::byteorder::{
         NativeEndian, ReadBytesExt, WriteBytesExt,
     };
@@ -1183,17 +1351,17 @@ mod io {
     flutter_rust_bridge::frb_generated_boilerplate_io!();
 
     #[unsafe(no_mangle)]
-    pub extern "C" fn frbgen_lab_05_rust_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+    pub extern "C" fn frbgen_lab_05_rust_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
         ptr: *const std::ffi::c_void,
     ) {
-        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>>::increment_strong_count(ptr as _);
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>>::increment_strong_count(ptr as _);
     }
 
     #[unsafe(no_mangle)]
-    pub extern "C" fn frbgen_lab_05_rust_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+    pub extern "C" fn frbgen_lab_05_rust_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
         ptr: *const std::ffi::c_void,
     ) {
-        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>>::decrement_strong_count(ptr as _);
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>>::decrement_strong_count(ptr as _);
     }
 }
 #[cfg(not(target_family = "wasm"))]
@@ -1208,7 +1376,7 @@ mod web {
     // Section: imports
 
     use super::*;
-    use crate::api::vector_index::*;
+    use crate::api::lance_store::*;
     use flutter_rust_bridge::for_generated::byteorder::{
         NativeEndian, ReadBytesExt, WriteBytesExt,
     };
@@ -1222,17 +1390,17 @@ mod web {
     flutter_rust_bridge::frb_generated_boilerplate_web!();
 
     #[wasm_bindgen]
-    pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+    pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
         ptr: *const std::ffi::c_void,
     ) {
-        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>>::increment_strong_count(ptr as _);
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>>::increment_strong_count(ptr as _);
     }
 
     #[wasm_bindgen]
-    pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+    pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
         ptr: *const std::ffi::c_void,
     ) {
-        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>>::decrement_strong_count(ptr as _);
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeChunkStore>>::decrement_strong_count(ptr as _);
     }
 }
 #[cfg(target_family = "wasm")]

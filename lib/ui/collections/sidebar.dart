@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/collection.dart';
+import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/ui/chat/chat_controller.dart';
 import 'package:lab_05/ui/collections/import_controller.dart';
 import 'package:lab_05/ui/core/theme.dart';
@@ -600,38 +601,53 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                                         bottom: 3,
                                         right: 8,
                                       ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            paper.status.name == 'ready'
-                                                ? Icons.description_outlined
-                                                : paper.status.name ==
-                                                      'processing'
-                                                ? Icons.sync
-                                                : Icons.error_outline,
-                                            size: 16,
-                                            color: paper.status.name == 'ready'
-                                                ? colorScheme.onSurfaceVariant
-                                                : paper.status.name ==
-                                                      'processing'
-                                                ? colorScheme.primary
-                                                : colorScheme.error,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              paper.title,
-                                              style: textTheme.bodySmall
-                                                  ?.copyWith(
-                                                    color: colorScheme
-                                                        .onSurfaceVariant,
-                                                    fontSize: 13,
-                                                  ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                      child: Tooltip(
+                                        message: _paperStatusMessage(paper),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              _paperStatusIcon(paper.status),
+                                              size: 16,
+                                              color: _paperStatusColor(
+                                                paper.status,
+                                                colorScheme,
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                paper.title,
+                                                style: textTheme.bodySmall
+                                                    ?.copyWith(
+                                                      color: colorScheme
+                                                          .onSurfaceVariant,
+                                                      fontSize: 13,
+                                                    ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (paper.status ==
+                                                DocumentStatus.needsReindex)
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.close,
+                                                  size: 14,
+                                                ),
+                                                tooltip: 'Forget this paper',
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                constraints:
+                                                    const BoxConstraints(),
+                                                padding: EdgeInsets.zero,
+                                                onPressed: () => ref
+                                                    .read(
+                                                      papersProvider.notifier,
+                                                    )
+                                                    .removePaper(paper.id),
+                                              ),
+                                          ],
+                                        ),
                                       ),
                                     );
                                   }).toList(),
@@ -1004,11 +1020,15 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
               Navigator.of(ctx).pop();
               await ref.read(chatControllerProvider.notifier).stop();
               if (!mounted) return;
+              // Release the LanceDB handles before removing the directory:
+              // Windows refuses a recursive delete while files are still open,
+              // and Riverpod's disposal is not synchronous.
+              ref.read(paperRepositoryProvider(col.id)).close();
+              ref.invalidate(paperRepositoryProvider(col.id));
               await ref
                   .read(collectionsProvider.notifier)
                   .deleteCollection(col.id);
               if (!mounted) return;
-              ref.invalidate(paperRepositoryProvider(col.id));
               if (ref.read(currentCollectionProvider)?.id == col.id) {
                 ref.read(currentCollectionProvider.notifier).state = null;
                 ref.read(currentChatProvider.notifier).state = null;
@@ -1024,5 +1044,49 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
         ],
       ),
     );
+  }
+}
+
+IconData _paperStatusIcon(DocumentStatus status) {
+  switch (status) {
+    case DocumentStatus.ready:
+      return Icons.description_outlined;
+    case DocumentStatus.processing:
+      return Icons.sync;
+    case DocumentStatus.needsReindex:
+      return Icons.refresh;
+    case DocumentStatus.failed:
+    case DocumentStatus.deleting:
+      return Icons.error_outline;
+  }
+}
+
+Color _paperStatusColor(DocumentStatus status, ColorScheme colorScheme) {
+  switch (status) {
+    case DocumentStatus.ready:
+      return colorScheme.onSurfaceVariant;
+    case DocumentStatus.processing:
+      return colorScheme.primary;
+    case DocumentStatus.needsReindex:
+      return colorScheme.tertiary;
+    case DocumentStatus.failed:
+    case DocumentStatus.deleting:
+      return colorScheme.error;
+  }
+}
+
+String _paperStatusMessage(PaperDocument paper) {
+  switch (paper.status) {
+    case DocumentStatus.ready:
+      return paper.title;
+    case DocumentStatus.processing:
+      return 'Importing…';
+    case DocumentStatus.needsReindex:
+      return paper.error ??
+          'Re-import this PDF to make it searchable again.';
+    case DocumentStatus.failed:
+      return paper.error ?? 'Import failed.';
+    case DocumentStatus.deleting:
+      return 'Deleting…';
   }
 }

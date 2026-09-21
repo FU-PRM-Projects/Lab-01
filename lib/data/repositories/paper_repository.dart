@@ -1,5 +1,4 @@
 import 'package:path/path.dart' as p;
-import 'package:lab_05/data/models/index_state.dart';
 
 import 'dart:io';
 import 'dart:math';
@@ -38,8 +37,17 @@ class PaperRepository {
       final index = CollectionIndex(
         dimensions: collection.embeddingProfile.dimensions,
       );
+      await index.open(storage.lanceDbDir(collectionId));
+      // Assign only after a successful open, so a failure cannot leave a broken
+      // store behind.
       _index = index;
-      await index.openOrCreate(storage.indexVectorsPath(collectionId));
+      try {
+        await _collectGarbage(index);
+      } catch (e) {
+        // A failed sweep must not make the collection unopenable; retrieval
+        // still refuses to cite anything that is not ready.
+        debugPrint('Stale-row sweep failed for $collectionId: $e');
+      }
       return index;
     } catch (_) {
       _opening = null;
@@ -47,7 +55,28 @@ class PaperRepository {
     }
   }
 
-  void close() => _index?.close();
+  /// Drops rows for documents that are not ready.
+  ///
+  /// This replaces the old dirty/clean `index/state.json` protocol: a crash
+  /// between the vector insert and the `ready` marker leaves rows for a
+  /// document that startup recovery then flips to `failed`, and this sweep
+  /// removes them the next time the collection is opened.
+  Future<void> _collectGarbage(CollectionIndex index) async {
+    final papers = await storage.listPapers(collectionId);
+    final ready = papers
+        .where((paper) => paper.status == DocumentStatus.ready)
+        .map((paper) => paper.id)
+        .toList();
+    await index.retainDocuments(ready);
+  }
+
+  void close() {
+    _index?.close();
+    _index = null;
+    // Clearing the cached future means a later openIndex() actually reopens
+    // instead of handing back a closed store.
+    _opening = null;
+  }
 
   Future<PaperDocument> importPaper({
     required File sourcePdfFile,
@@ -94,7 +123,6 @@ class PaperRepository {
       status: DocumentStatus.processing,
       createdAt: DateTime.now().toUtc(),
       embeddingProfileId: embeddings.model,
-      chunks: const [],
     );
     await storage.savePaper(collectionId, paperDoc);
 
@@ -144,7 +172,6 @@ class PaperRepository {
           for (var i = 0; i < merged.length; i++)
             PaperChunk(
               id: merged[i].id,
-              vectorId: merged[i].vectorId,
               page: merged[i].page,
               ordinal: i,
               section: merged[i].section,
@@ -175,99 +202,75 @@ class PaperRepository {
         );
       }
 
-      // 5. Reserve monotonic vector IDs from collection
-      final collection = await storage.loadCollection(collectionId);
-      if (collection == null) {
-        throw StateError('Collection $collectionId not found');
-      }
+      // 5. Attach document context to the chunks. There are no vector ids to
+      //    reserve: the store keys rows by the chunk's own id.
+      final chunks = chunksToIndex
+          .map(
+            (chunk) => PaperChunk(
+              id: chunk.id,
+              page: chunk.page,
+              ordinal: chunk.ordinal,
+              section: chunk.section,
+              startChar: chunk.startChar,
+              endChar: chunk.endChar,
+              text: chunk.text,
+              documentId: documentId,
+              documentTitle: extractResult.title,
+              documentFileName: originalFileName,
+            ),
+          )
+          .toList();
 
-      int currentVectorId = collection.nextVectorId;
-      final List<PaperChunk> assignedChunks = [];
-      for (final chunk in chunksToIndex) {
-        assignedChunks.add(
-          PaperChunk(
-            id: chunk.id,
-            vectorId: currentVectorId++,
-            page: chunk.page,
-            ordinal: chunk.ordinal,
-            section: chunk.section,
-            startChar: chunk.startChar,
-            endChar: chunk.endChar,
-            text: chunk.text,
-            documentId: documentId,
-            documentTitle: extractResult.title,
-            documentFileName: originalFileName,
-          ),
-        );
-      }
-
-      // Update collection nextVectorId
-      await storage.saveCollection(
-        collection.copyWith(nextVectorId: currentVectorId),
-      );
-
-      // Save assigned chunks in metadata before vector insert
       paperDoc = paperDoc.copyWith(
         title: extractResult.title,
         pageCount: extractResult.pageCount,
-        chunks: assignedChunks,
       );
       await storage.savePaper(collectionId, paperDoc);
 
       // 6. Generate embeddings
       onProgress?.call(
-        'Generating embeddings (${assignedChunks.length} chunks)...',
+        'Generating embeddings (${chunks.length} chunks)...',
         0.5,
       );
-      final chunkTexts = assignedChunks.map((c) => c.text).toList();
-      final vectors = await embeddings.embedTexts(chunkTexts);
+      final vectors = await embeddings.embedTexts(
+        chunks.map((chunk) => chunk.text).toList(),
+      );
 
-      if (vectors.length != assignedChunks.length) {
+      if (vectors.length != chunks.length) {
         throw StateError(
-          'Embedding count mismatch: expected ${assignedChunks.length}, got ${vectors.length}',
+          'Embedding count mismatch: expected ${chunks.length}, got ${vectors.length}',
         );
       }
 
-      // 7. Save index state as dirty before native mutation
+      // 7. Insert in one transaction, only after the embeddings succeeded.
+      //    There is no dirty marker to write: the append either commits or it
+      //    does not, and recovery converges via _collectGarbage.
       onProgress?.call('Indexing vectors...', 0.8);
-      final indexFilePath = storage.indexVectorsPath(collectionId);
       if (!index.isOpen) {
-        await index.openOrCreate(indexFilePath);
+        await index.open(storage.lanceDbDir(collectionId));
       }
+      await index.add(chunks, vectors);
 
-      await storage.saveIndexState(
-        collectionId,
-        IndexState(
-          status: 'dirty',
-          embeddingProfileId: collection.embeddingProfile.id,
-          dimensions: collection.embeddingProfile.dimensions,
-          pending: {'operation': 'import', 'documentId': documentId},
-        ),
-      );
-
-      // 8. Insert vectors into TurboVEC index and save
-      await index.add(assignedChunks, vectors);
-      await index.save(indexFilePath);
-
-      // 9. Mark paper as ready, index state as clean
+      // 8. Mark the paper ready, then compact. Every append adds a dataset
+      //    version, so compaction keeps the store from growing without bound.
       paperDoc = paperDoc.copyWith(status: DocumentStatus.ready);
       await storage.savePaper(collectionId, paperDoc);
-
-      await storage.saveIndexState(
-        collectionId,
-        IndexState(
-          status: 'clean',
-          embeddingProfileId: collection.embeddingProfile.id,
-          dimensions: collection.embeddingProfile.dimensions,
-          vectorCount: index.length,
-          pending: null,
-        ),
-      );
+      try {
+        await index.compact();
+      } catch (e) {
+        debugPrint('Compaction after import failed (non-fatal): $e');
+      }
 
       onProgress?.call('Paper ready!', 1.0);
       return paperDoc;
     } catch (e, stack) {
       debugPrint('Import paper failed for $documentId: $e\n$stack');
+      // Drop anything that made it into the store for this document.
+      try {
+        await index.deleteDocument(documentId);
+      } catch (cleanupError) {
+        debugPrint('Cleanup after failed import failed: $cleanupError');
+      }
       paperDoc = paperDoc.copyWith(
         status: DocumentStatus.failed,
         error: e.toString(),
@@ -395,7 +398,6 @@ class PaperRepository {
             // ':ocr' in the id (not the section) marks OCR chunks and keeps
             // ids from clashing with text chunks on the same page.
             id: '$documentId:p${rc.page}:ocr${rc.ordinal}',
-            vectorId: 0,
             page: rc.page,
             ordinal: rc.ordinal,
             section: rc.section,

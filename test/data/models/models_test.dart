@@ -12,7 +12,6 @@ void main() {
         id: 'col_123',
         name: 'GraphRAG Research',
         createdAt: DateTime.utc(2026, 9, 14, 8, 0, 0),
-        nextVectorId: 101,
         embeddingProfile: const EmbeddingProfile(
           id: 'profile_123',
           model: 'google/gemini-embedding-2',
@@ -27,7 +26,6 @@ void main() {
 
       expect(roundtrip.id, equals('col_123'));
       expect(roundtrip.name, equals('GraphRAG Research'));
-      expect(roundtrip.nextVectorId, equals(101));
       expect(
         roundtrip.embeddingProfile.model,
         equals('google/gemini-embedding-2'),
@@ -35,18 +33,7 @@ void main() {
       expect(roundtrip.embeddingProfile.dimensions, equals(768));
     });
 
-    test('PaperDocument and PaperChunk serialization', () {
-      final chunk = PaperChunk(
-        id: 'doc_1:p5:c0',
-        vectorId: 42,
-        page: 5,
-        ordinal: 0,
-        section: 'Methodology',
-        startChar: 100,
-        endChar: 450,
-        text: 'Personalized PageRank on bipartite graph.',
-      );
-
+    test('PaperDocument serialization', () {
       final doc = PaperDocument(
         id: 'doc_1',
         fileName: 'paper.pdf',
@@ -57,7 +44,6 @@ void main() {
         status: DocumentStatus.ready,
         createdAt: DateTime.utc(2026, 9, 14, 8, 5, 0),
         embeddingProfileId: 'profile_123',
-        chunks: [chunk],
       );
 
       final json = doc.toJson();
@@ -66,10 +52,59 @@ void main() {
       expect(roundtrip.id, equals('doc_1'));
       expect(roundtrip.title, equals('HippoRAG Paper'));
       expect(roundtrip.status, equals(DocumentStatus.ready));
-      expect(roundtrip.chunks.length, equals(1));
-      expect(roundtrip.chunks.first.vectorId, equals(42));
-      expect(roundtrip.chunks.first.section, equals('Methodology'));
-      expect(roundtrip.chunks.first.documentId, equals('doc_1'));
+      expect(roundtrip.pageCount, equals(12));
+      expect(roundtrip.authors, equals(['Researcher A', 'Researcher B']));
+    });
+
+    test('Metadata written before the LanceDB migration still parses', () {
+      // Chunks and vector ids used to live in this file; both are now owned by
+      // the vector store, and the leftover keys must not break loading.
+      final legacy = <String, dynamic>{
+        'schemaVersion': 1,
+        'id': 'doc_1',
+        'fileName': 'paper.pdf',
+        'title': 'HippoRAG Paper',
+        'sha256': 'abcdef123456',
+        'pageCount': 12,
+        'status': 'ready',
+        'createdAt': '2026-09-14T08:05:00.000Z',
+        'embeddingProfileId': 'profile_123',
+        'chunks': [
+          {'id': 'doc_1:p5:c0', 'vectorId': 42, 'page': 5, 'text': 'legacy'},
+        ],
+      };
+
+      final doc = PaperDocument.fromJson(legacy);
+
+      expect(doc.id, equals('doc_1'));
+      expect(doc.status, equals(DocumentStatus.ready));
+      expect(doc.toJson().containsKey('chunks'), isFalse);
+    });
+
+    test('PaperChunk derives its document id from the chunk id', () {
+      const textChunk = PaperChunk(
+        id: 'doc_1:p5:c0',
+        page: 5,
+        ordinal: 0,
+        section: 'Methodology',
+        startChar: 100,
+        endChar: 450,
+        text: 'Personalized PageRank on bipartite graph.',
+      );
+      const ocrChunk = PaperChunk(
+        id: 'doc_1:p5:ocr0',
+        page: 5,
+        ordinal: 1,
+        section: '',
+        startChar: 0,
+        endChar: 10,
+        text: 'scanned',
+      );
+
+      expect(textChunk.parentDocId, equals('doc_1'));
+      // OCR chunks carry ':ocr' so they cannot collide with the text chunks of
+      // the same page, and the document id is still the leading segment.
+      expect(ocrChunk.parentDocId, equals('doc_1'));
     });
 
     test('Citation serialization', () {

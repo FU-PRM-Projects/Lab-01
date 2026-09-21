@@ -6,8 +6,8 @@
 // Static analysis wrongly picks the IO variant, thus ignore this
 // ignore_for_file: argument_type_not_assignable
 
+import 'api/lance_store.dart';
 import 'api/pdf_parser.dart';
-import 'api/vector_index.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -25,41 +25,32 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   });
 
   CrossPlatformFinalizerArg
-  get rust_arc_decrement_strong_count_NativeVectorIndexPtr => wire
-      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex;
+  get rust_arc_decrement_strong_count_NativeChunkStorePtr => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore;
 
   @protected
-  NativeVectorIndex
-  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  NativeChunkStore
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     dynamic raw,
   );
 
   @protected
-  NativeVectorIndex
-  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  NativeChunkStore
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     dynamic raw,
   );
-
-  @protected
-  int dco_decode_CastedPrimitive_i_64(dynamic raw);
-
-  @protected
-  int dco_decode_CastedPrimitive_u_64(dynamic raw);
 
   @protected
   int dco_decode_CastedPrimitive_usize(dynamic raw);
 
   @protected
-  NativeVectorIndex
-  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  NativeChunkStore
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     dynamic raw,
   );
 
   @protected
   String dco_decode_String(dynamic raw);
-
-  @protected
-  bool dco_decode_bool(dynamic raw);
 
   @protected
   double dco_decode_f_32(dynamic raw);
@@ -68,10 +59,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int dco_decode_i_32(dynamic raw);
 
   @protected
-  PlatformInt64 dco_decode_i_64(dynamic raw);
-
-  @protected
-  List<int> dco_decode_list_CastedPrimitive_u_64(dynamic raw);
+  List<String> dco_decode_list_String(dynamic raw);
 
   @protected
   List<double> dco_decode_list_prim_f_32_loose(dynamic raw);
@@ -86,28 +74,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
-  List<RustPaperChunk> dco_decode_list_rust_paper_chunk(dynamic raw);
+  List<RustChunkHit> dco_decode_list_rust_chunk_hit(dynamic raw);
 
   @protected
-  List<RustSearchResult> dco_decode_list_rust_search_result(dynamic raw);
+  List<RustChunkRow> dco_decode_list_rust_chunk_row(dynamic raw);
+
+  @protected
+  List<RustPaperChunk> dco_decode_list_rust_paper_chunk(dynamic raw);
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
-  List<int>? dco_decode_opt_list_CastedPrimitive_u_64(dynamic raw);
+  RustChunkHit dco_decode_rust_chunk_hit(dynamic raw);
+
+  @protected
+  RustChunkRow dco_decode_rust_chunk_row(dynamic raw);
 
   @protected
   RustPaperChunk dco_decode_rust_paper_chunk(dynamic raw);
 
   @protected
   RustPdfProcessedResult dco_decode_rust_pdf_processed_result(dynamic raw);
-
-  @protected
-  RustSearchResult dco_decode_rust_search_result(dynamic raw);
-
-  @protected
-  BigInt dco_decode_u_64(dynamic raw);
 
   @protected
   int dco_decode_u_8(dynamic raw);
@@ -119,37 +107,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt dco_decode_usize(dynamic raw);
 
   @protected
-  NativeVectorIndex
-  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  NativeChunkStore
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     SseDeserializer deserializer,
   );
 
   @protected
-  NativeVectorIndex
-  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  NativeChunkStore
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     SseDeserializer deserializer,
   );
-
-  @protected
-  int sse_decode_CastedPrimitive_i_64(SseDeserializer deserializer);
-
-  @protected
-  int sse_decode_CastedPrimitive_u_64(SseDeserializer deserializer);
 
   @protected
   int sse_decode_CastedPrimitive_usize(SseDeserializer deserializer);
 
   @protected
-  NativeVectorIndex
-  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  NativeChunkStore
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     SseDeserializer deserializer,
   );
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
-
-  @protected
-  bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
   double sse_decode_f_32(SseDeserializer deserializer);
@@ -158,10 +137,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
-  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
-
-  @protected
-  List<int> sse_decode_list_CastedPrimitive_u_64(SseDeserializer deserializer);
+  List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
   List<double> sse_decode_list_prim_f_32_loose(SseDeserializer deserializer);
@@ -176,12 +152,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
-  List<RustPaperChunk> sse_decode_list_rust_paper_chunk(
+  List<RustChunkHit> sse_decode_list_rust_chunk_hit(
     SseDeserializer deserializer,
   );
 
   @protected
-  List<RustSearchResult> sse_decode_list_rust_search_result(
+  List<RustChunkRow> sse_decode_list_rust_chunk_row(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<RustPaperChunk> sse_decode_list_rust_paper_chunk(
     SseDeserializer deserializer,
   );
 
@@ -189,9 +170,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
-  List<int>? sse_decode_opt_list_CastedPrimitive_u_64(
-    SseDeserializer deserializer,
-  );
+  RustChunkHit sse_decode_rust_chunk_hit(SseDeserializer deserializer);
+
+  @protected
+  RustChunkRow sse_decode_rust_chunk_row(SseDeserializer deserializer);
 
   @protected
   RustPaperChunk sse_decode_rust_paper_chunk(SseDeserializer deserializer);
@@ -200,12 +182,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RustPdfProcessedResult sse_decode_rust_pdf_processed_result(
     SseDeserializer deserializer,
   );
-
-  @protected
-  RustSearchResult sse_decode_rust_search_result(SseDeserializer deserializer);
-
-  @protected
-  BigInt sse_decode_u_64(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_8(SseDeserializer deserializer);
@@ -217,40 +193,34 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt sse_decode_usize(SseDeserializer deserializer);
 
   @protected
+  bool sse_decode_bool(SseDeserializer deserializer);
+
+  @protected
   void
-  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
-    NativeVectorIndex self,
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
+    NativeChunkStore self,
     SseSerializer serializer,
   );
 
   @protected
   void
-  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
-    NativeVectorIndex self,
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
+    NativeChunkStore self,
     SseSerializer serializer,
   );
-
-  @protected
-  void sse_encode_CastedPrimitive_i_64(int self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_CastedPrimitive_u_64(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_CastedPrimitive_usize(int self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
-    NativeVectorIndex self,
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
+    NativeChunkStore self,
     SseSerializer serializer,
   );
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
   void sse_encode_f_32(double self, SseSerializer serializer);
@@ -259,13 +229,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
-  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_list_CastedPrimitive_u_64(
-    List<int> self,
-    SseSerializer serializer,
-  );
+  void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_f_32_loose(
@@ -292,14 +256,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_list_rust_paper_chunk(
-    List<RustPaperChunk> self,
+  void sse_encode_list_rust_chunk_hit(
+    List<RustChunkHit> self,
     SseSerializer serializer,
   );
 
   @protected
-  void sse_encode_list_rust_search_result(
-    List<RustSearchResult> self,
+  void sse_encode_list_rust_chunk_row(
+    List<RustChunkRow> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_rust_paper_chunk(
+    List<RustPaperChunk> self,
     SseSerializer serializer,
   );
 
@@ -307,10 +277,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
-  void sse_encode_opt_list_CastedPrimitive_u_64(
-    List<int>? self,
-    SseSerializer serializer,
-  );
+  void sse_encode_rust_chunk_hit(RustChunkHit self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_rust_chunk_row(RustChunkRow self, SseSerializer serializer);
 
   @protected
   void sse_encode_rust_paper_chunk(
@@ -325,15 +295,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_rust_search_result(
-    RustSearchResult self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_u_64(BigInt self, SseSerializer serializer);
-
-  @protected
   void sse_encode_u_8(int self, SseSerializer serializer);
 
   @protected
@@ -341,6 +302,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_usize(BigInt self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_bool(bool self, SseSerializer serializer);
 }
 
 // Section: wire_class
@@ -349,18 +313,18 @@ class RustLibWire implements BaseWire {
   RustLibWire.fromExternalLibrary(ExternalLibrary lib);
 
   void
-  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     int ptr,
   ) => wasmModule
-      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
         ptr,
       );
 
   void
-  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     int ptr,
   ) => wasmModule
-      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
         ptr,
       );
 }
@@ -372,12 +336,12 @@ external RustLibWasmModule get wasmModule;
 @anonymous
 extension type RustLibWasmModule._(JSObject _) implements JSObject {
   external void
-  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     int ptr,
   );
 
   external void
-  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     int ptr,
   );
 }

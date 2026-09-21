@@ -1,55 +1,34 @@
 import 'package:lab_05/data/models/paper.dart';
-import 'package:lab_05/data/services/local_storage.dart';
 import 'package:lab_05/data/services/collection_index.dart';
 import 'package:lab_05/data/services/embedding_client.dart';
 
+/// Retrieves the passages most relevant to [query].
+///
+/// The store is already scoped to one collection and only holds rows for ready
+/// documents, so there is no allowlist to build and no metadata to read from
+/// disk: the hits carry their own text, page and offsets.
 Future<List<PaperChunk>> retrieve(
-  String collectionId,
   String query, {
-  required LocalStorage storage,
   required EmbeddingClient embeddings,
   required CollectionIndex index,
   int topK = 15,
   int finalLimit = 8,
 }) async {
-  // 1. Fetch ready documents in collection to build vectorId -> chunk lookup
-  final papers = await storage.listPapers(collectionId);
-  final readyPapers = papers
-      .where((p) => p.status == DocumentStatus.ready)
-      .toList();
-  if (readyPapers.isEmpty) return [];
+  // Check before embedding: an empty collection must not cost an API call.
+  if (index.length == 0) return [];
 
-  final Map<int, PaperChunk> chunkMap = {};
-  for (final paper in readyPapers) {
-    for (final chunk in paper.chunks) {
-      chunkMap[chunk.vectorId] = chunk;
-    }
-  }
-
-  if (chunkMap.isEmpty) return [];
-
-  // 2. Embed the query
   final queryVec = await embeddings.embedText(query);
+  final hits = await index.search(queryVec, topK: topK);
 
-  // 3. Search TurboVEC index
-  final searchResults = await index.search(
-    queryVec,
-    topK: topK,
-    allowlist: chunkMap.keys.toList(),
-  );
-
-  // 4. Map search results to chunks and deduplicate
   final List<PaperChunk> matchedChunks = [];
   final Set<String> seenKeys = {};
 
-  for (final res in searchResults) {
-    final chunk = chunkMap[res.vectorId];
-    if (chunk == null) continue;
+  for (final hit in hits) {
+    final chunk = hit.chunk;
 
     // Deduplication key: same doc and same page and overlapping text
     final dedupKey = '${chunk.parentDocId}_${chunk.page}_${chunk.startChar}';
-    if (seenKeys.contains(dedupKey)) continue;
-    seenKeys.add(dedupKey);
+    if (!seenKeys.add(dedupKey)) continue;
 
     matchedChunks.add(chunk);
     if (matchedChunks.length >= finalLimit) break;

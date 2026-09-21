@@ -35,7 +35,6 @@ Future<List<RustPaperChunk>> chunkText({
 
 class RustPaperChunk {
   final String id;
-  final int vectorId;
   final int page;
   final int ordinal;
   final String section;
@@ -45,7 +44,6 @@ class RustPaperChunk {
 
   const RustPaperChunk({
     required this.id,
-    required this.vectorId,
     required this.page,
     required this.ordinal,
     required this.section,
@@ -57,7 +55,6 @@ class RustPaperChunk {
   @override
   int get hashCode =>
       id.hashCode ^
-      vectorId.hashCode ^
       page.hashCode ^
       ordinal.hashCode ^
       section.hashCode ^
@@ -71,7 +68,6 @@ class RustPaperChunk {
       other is RustPaperChunk &&
           runtimeType == other.runtimeType &&
           id == other.id &&
-          vectorId == other.vectorId &&
           page == other.page &&
           ordinal == other.ordinal &&
           section == other.section &&

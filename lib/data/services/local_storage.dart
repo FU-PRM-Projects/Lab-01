@@ -6,7 +6,6 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'package:lab_05/data/models/app_settings.dart';
-import 'package:lab_05/data/models/index_state.dart';
 
 import 'package:lab_05/data/models/chat.dart';
 import 'package:lab_05/data/models/collection.dart';
@@ -74,9 +73,12 @@ class LocalStorage {
       p.join(documentsDir(collectionId), '$documentId.pdf');
   String paperMetadataPath(String collectionId, String documentId) =>
       p.join(metadataDir(collectionId), '$documentId.json');
-  String indexVectorsPath(String collectionId) =>
+  /// Directory owned by LanceDB. Never write app JSON into it.
+  String lanceDbDir(String collectionId) =>
+      p.join(indexDir(collectionId), 'lance');
+  String legacyIndexVectorsPath(String collectionId) =>
       p.join(indexDir(collectionId), 'vectors.tvim');
-  String indexStatePath(String collectionId) =>
+  String legacyIndexStatePath(String collectionId) =>
       p.join(indexDir(collectionId), 'state.json');
   String chatJsonPath(String collectionId, String chatId) =>
       p.join(chatsDir(collectionId), '$chatId.json');
@@ -286,24 +288,6 @@ class LocalStorage {
     }
   }
 
-  // Index state
-  Future<IndexState> loadIndexState(
-    String collectionId, {
-    required String embeddingProfileId,
-  }) async {
-    final json = await readJsonSafely(indexStatePath(collectionId));
-    if (json == null) {
-      final defaultState = IndexState(embeddingProfileId: embeddingProfileId);
-      await saveIndexState(collectionId, defaultState);
-      return defaultState;
-    }
-    return IndexState.fromJson(json);
-  }
-
-  Future<void> saveIndexState(String collectionId, IndexState state) async {
-    await writeJsonSafely(indexStatePath(collectionId), state.toJson());
-  }
-
   // Startup Recovery
   Future<void> runStartupRecovery() async {
     final colDir = Directory(collectionsPath);
@@ -313,22 +297,10 @@ class LocalStorage {
       if (entity is Directory) {
         final collectionId = p.basename(entity.path);
         try {
-          // 1. Recover dirty index state if pending
-          final indexFile = File(indexStatePath(collectionId));
-          if (await indexFile.exists()) {
-            final stateJson = await readJsonSafely(indexFile.path);
-            if (stateJson != null) {
-              final status = stateJson['status'];
-              if (status == 'dirty') {
-                debugPrint(
-                  'Reconciling dirty index state for collection $collectionId',
-                );
-                stateJson['status'] = 'needsReindex';
-                stateJson['pending'] = null;
-                await writeJsonSafely(indexFile.path, stateJson);
-              }
-            }
-          }
+          // 1. Retire a legacy TVEC index. Its vectors were the only copy of
+          //    the embeddings and cannot be re-keyed, so the affected papers are
+          //    marked for re-import rather than silently returning no results.
+          await _retireLegacyIndex(collectionId);
 
           // 2. Mark any dangling processing documents as failed
           final metaD = Directory(metadataDir(collectionId));
@@ -352,5 +324,41 @@ class LocalStorage {
         }
       }
     }
+  }
+
+  /// Deletes a pre-LanceDB index and marks its papers as needing re-import.
+  ///
+  /// Idempotent: the marker file is removed last, so a crash part-way re-runs
+  /// safely. PDFs are kept so the user can re-import without re-sourcing them.
+  Future<void> _retireLegacyIndex(String collectionId) async {
+    final legacyVectors = File(legacyIndexVectorsPath(collectionId));
+    final legacyState = File(legacyIndexStatePath(collectionId));
+    if (!await legacyVectors.exists()) {
+      if (await legacyState.exists()) await legacyState.delete();
+      return;
+    }
+
+    var affected = 0;
+    final metaD = Directory(metadataDir(collectionId));
+    if (await metaD.exists()) {
+      for (final entity in metaD.listSync()) {
+        if (entity is! File || !entity.path.endsWith('.json')) continue;
+        final json = await readJsonSafely(entity.path);
+        if (json == null || json['status'] != 'ready') continue;
+        json['status'] = DocumentStatus.needsReindex.name;
+        json['error'] =
+            'The search index format changed. Re-import this PDF to make it '
+            'searchable again.';
+        await writeJsonSafely(entity.path, json);
+        affected++;
+      }
+    }
+
+    if (await legacyState.exists()) await legacyState.delete();
+    await legacyVectors.delete();
+    debugPrint(
+      'Retired legacy vector index for collection $collectionId '
+      '($affected papers need re-import)',
+    );
   }
 }

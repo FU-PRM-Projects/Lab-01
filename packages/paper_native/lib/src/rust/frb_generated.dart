@@ -3,8 +3,8 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
+import 'api/lance_store.dart';
 import 'api/pdf_parser.dart';
-import 'api/vector_index.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -70,7 +70,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1922943509;
+  int get rustContentHash => -2114872438;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -82,45 +82,54 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
-  Future<void> crateApiVectorIndexNativeVectorIndexAddBatch({
-    required NativeVectorIndex that,
-    required List<int> ids,
+  Future<void> crateApiLanceStoreNativeChunkStoreAdd({
+    required NativeChunkStore that,
+    required List<RustChunkRow> rows,
     required List<double> vectors,
-    required int dim,
   });
 
-  Future<int> crateApiVectorIndexNativeVectorIndexDim({
-    required NativeVectorIndex that,
+  Future<void> crateApiLanceStoreNativeChunkStoreCompact({
+    required NativeChunkStore that,
   });
 
-  Future<int> crateApiVectorIndexNativeVectorIndexLen({
-    required NativeVectorIndex that,
+  Future<int> crateApiLanceStoreNativeChunkStoreCount({
+    required NativeChunkStore that,
   });
 
-  Future<NativeVectorIndex> crateApiVectorIndexNativeVectorIndexLoad({
+  Future<void> crateApiLanceStoreNativeChunkStoreDeleteDoc({
+    required NativeChunkStore that,
+    required String docId,
+  });
+
+  Future<int> crateApiLanceStoreNativeChunkStoreDim({
+    required NativeChunkStore that,
+  });
+
+  Future<List<String>> crateApiLanceStoreNativeChunkStoreDocIds({
+    required NativeChunkStore that,
+  });
+
+  Future<NativeChunkStore> crateApiLanceStoreNativeChunkStoreOpen({
     required String path,
-  });
-
-  Future<NativeVectorIndex> crateApiVectorIndexNativeVectorIndexNew({
     required int dim,
-    required int bitWidth,
   });
 
-  Future<bool> crateApiVectorIndexNativeVectorIndexRemove({
-    required NativeVectorIndex that,
-    required int id,
+  Future<List<RustChunkRow>> crateApiLanceStoreNativeChunkStorePageChunks({
+    required NativeChunkStore that,
+    required String docId,
+    required int page,
+    required int limit,
   });
 
-  Future<List<RustSearchResult>> crateApiVectorIndexNativeVectorIndexSearch({
-    required NativeVectorIndex that,
+  Future<int> crateApiLanceStoreNativeChunkStoreRetainDocs({
+    required NativeChunkStore that,
+    required List<String> docIds,
+  });
+
+  Future<List<RustChunkHit>> crateApiLanceStoreNativeChunkStoreSearch({
+    required NativeChunkStore that,
     required List<double> query,
     required int k,
-    List<int>? allowlist,
-  });
-
-  Future<void> crateApiVectorIndexNativeVectorIndexWrite({
-    required NativeVectorIndex that,
-    required String path,
   });
 
   Future<List<RustPaperChunk>> crateApiPdfParserChunkText({
@@ -140,13 +149,13 @@ abstract class RustLibApi extends BaseApi {
   });
 
   RustArcIncrementStrongCountFnType
-  get rust_arc_increment_strong_count_NativeVectorIndex;
+  get rust_arc_increment_strong_count_NativeChunkStore;
 
   RustArcDecrementStrongCountFnType
-  get rust_arc_decrement_strong_count_NativeVectorIndex;
+  get rust_arc_decrement_strong_count_NativeChunkStore;
 
   CrossPlatformFinalizerArg
-  get rust_arc_decrement_strong_count_NativeVectorIndexPtr;
+  get rust_arc_decrement_strong_count_NativeChunkStorePtr;
 }
 
 class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
@@ -158,23 +167,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   });
 
   @override
-  Future<void> crateApiVectorIndexNativeVectorIndexAddBatch({
-    required NativeVectorIndex that,
-    required List<int> ids,
+  Future<void> crateApiLanceStoreNativeChunkStoreAdd({
+    required NativeChunkStore that,
+    required List<RustChunkRow> rows,
     required List<double> vectors,
-    required int dim,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
             that,
             serializer,
           );
-          sse_encode_list_CastedPrimitive_u_64(ids, serializer);
+          sse_encode_list_rust_chunk_row(rows, serializer);
           sse_encode_list_prim_f_32_loose(vectors, serializer);
-          sse_encode_CastedPrimitive_usize(dim, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -186,28 +193,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_String,
         ),
-        constMeta: kCrateApiVectorIndexNativeVectorIndexAddBatchConstMeta,
-        argValues: [that, ids, vectors, dim],
+        constMeta: kCrateApiLanceStoreNativeChunkStoreAddConstMeta,
+        argValues: [that, rows, vectors],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiVectorIndexNativeVectorIndexAddBatchConstMeta =>
+  TaskConstMeta get kCrateApiLanceStoreNativeChunkStoreAddConstMeta =>
       const TaskConstMeta(
-        debugName: "NativeVectorIndex_add_batch",
-        argNames: ["that", "ids", "vectors", "dim"],
+        debugName: "NativeChunkStore_add",
+        argNames: ["that", "rows", "vectors"],
       );
 
   @override
-  Future<int> crateApiVectorIndexNativeVectorIndexDim({
-    required NativeVectorIndex that,
+  Future<void> crateApiLanceStoreNativeChunkStoreCompact({
+    required NativeChunkStore that,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
             that,
             serializer,
           );
@@ -219,31 +226,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_CastedPrimitive_usize,
+          decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_String,
         ),
-        constMeta: kCrateApiVectorIndexNativeVectorIndexDimConstMeta,
+        constMeta: kCrateApiLanceStoreNativeChunkStoreCompactConstMeta,
         argValues: [that],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiVectorIndexNativeVectorIndexDimConstMeta =>
+  TaskConstMeta get kCrateApiLanceStoreNativeChunkStoreCompactConstMeta =>
       const TaskConstMeta(
-        debugName: "NativeVectorIndex_dim",
+        debugName: "NativeChunkStore_compact",
         argNames: ["that"],
       );
 
   @override
-  Future<int> crateApiVectorIndexNativeVectorIndexLen({
-    required NativeVectorIndex that,
+  Future<int> crateApiLanceStoreNativeChunkStoreCount({
+    required NativeChunkStore that,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
             that,
             serializer,
           );
@@ -258,28 +265,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_CastedPrimitive_usize,
           decodeErrorData: sse_decode_String,
         ),
-        constMeta: kCrateApiVectorIndexNativeVectorIndexLenConstMeta,
+        constMeta: kCrateApiLanceStoreNativeChunkStoreCountConstMeta,
         argValues: [that],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiVectorIndexNativeVectorIndexLenConstMeta =>
+  TaskConstMeta get kCrateApiLanceStoreNativeChunkStoreCountConstMeta =>
       const TaskConstMeta(
-        debugName: "NativeVectorIndex_len",
+        debugName: "NativeChunkStore_count",
         argNames: ["that"],
       );
 
   @override
-  Future<NativeVectorIndex> crateApiVectorIndexNativeVectorIndexLoad({
-    required String path,
+  Future<void> crateApiLanceStoreNativeChunkStoreDeleteDoc({
+    required NativeChunkStore that,
+    required String docId,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(path, serializer);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
+            that,
+            serializer,
+          );
+          sse_encode_String(docId, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -288,34 +300,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
         },
         codec: SseCodec(
-          decodeSuccessData:
-              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex,
+          decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_String,
         ),
-        constMeta: kCrateApiVectorIndexNativeVectorIndexLoadConstMeta,
-        argValues: [path],
+        constMeta: kCrateApiLanceStoreNativeChunkStoreDeleteDocConstMeta,
+        argValues: [that, docId],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiVectorIndexNativeVectorIndexLoadConstMeta =>
+  TaskConstMeta get kCrateApiLanceStoreNativeChunkStoreDeleteDocConstMeta =>
       const TaskConstMeta(
-        debugName: "NativeVectorIndex_load",
-        argNames: ["path"],
+        debugName: "NativeChunkStore_delete_doc",
+        argNames: ["that", "docId"],
       );
 
   @override
-  Future<NativeVectorIndex> crateApiVectorIndexNativeVectorIndexNew({
-    required int dim,
-    required int bitWidth,
+  Future<int> crateApiLanceStoreNativeChunkStoreDim({
+    required NativeChunkStore that,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_CastedPrimitive_usize(dim, serializer);
-          sse_encode_CastedPrimitive_usize(bitWidth, serializer);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
+            that,
+            serializer,
+          );
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -324,37 +336,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
         },
         codec: SseCodec(
-          decodeSuccessData:
-              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex,
+          decodeSuccessData: sse_decode_CastedPrimitive_usize,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiVectorIndexNativeVectorIndexNewConstMeta,
-        argValues: [dim, bitWidth],
+        constMeta: kCrateApiLanceStoreNativeChunkStoreDimConstMeta,
+        argValues: [that],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiVectorIndexNativeVectorIndexNewConstMeta =>
+  TaskConstMeta get kCrateApiLanceStoreNativeChunkStoreDimConstMeta =>
       const TaskConstMeta(
-        debugName: "NativeVectorIndex_new",
-        argNames: ["dim", "bitWidth"],
+        debugName: "NativeChunkStore_dim",
+        argNames: ["that"],
       );
 
   @override
-  Future<bool> crateApiVectorIndexNativeVectorIndexRemove({
-    required NativeVectorIndex that,
-    required int id,
+  Future<List<String>> crateApiLanceStoreNativeChunkStoreDocIds({
+    required NativeChunkStore that,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
             that,
             serializer,
           );
-          sse_encode_CastedPrimitive_u_64(id, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -363,40 +372,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_bool,
+          decodeSuccessData: sse_decode_list_String,
           decodeErrorData: sse_decode_String,
         ),
-        constMeta: kCrateApiVectorIndexNativeVectorIndexRemoveConstMeta,
-        argValues: [that, id],
+        constMeta: kCrateApiLanceStoreNativeChunkStoreDocIdsConstMeta,
+        argValues: [that],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiVectorIndexNativeVectorIndexRemoveConstMeta =>
+  TaskConstMeta get kCrateApiLanceStoreNativeChunkStoreDocIdsConstMeta =>
       const TaskConstMeta(
-        debugName: "NativeVectorIndex_remove",
-        argNames: ["that", "id"],
+        debugName: "NativeChunkStore_doc_ids",
+        argNames: ["that"],
       );
 
   @override
-  Future<List<RustSearchResult>> crateApiVectorIndexNativeVectorIndexSearch({
-    required NativeVectorIndex that,
-    required List<double> query,
-    required int k,
-    List<int>? allowlist,
+  Future<NativeChunkStore> crateApiLanceStoreNativeChunkStoreOpen({
+    required String path,
+    required int dim,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
-            that,
-            serializer,
-          );
-          sse_encode_list_prim_f_32_loose(query, serializer);
-          sse_encode_CastedPrimitive_usize(k, serializer);
-          sse_encode_opt_list_CastedPrimitive_u_64(allowlist, serializer);
+          sse_encode_String(path, serializer);
+          sse_encode_CastedPrimitive_usize(dim, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -405,36 +407,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_list_rust_search_result,
+          decodeSuccessData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore,
           decodeErrorData: sse_decode_String,
         ),
-        constMeta: kCrateApiVectorIndexNativeVectorIndexSearchConstMeta,
-        argValues: [that, query, k, allowlist],
+        constMeta: kCrateApiLanceStoreNativeChunkStoreOpenConstMeta,
+        argValues: [path, dim],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiVectorIndexNativeVectorIndexSearchConstMeta =>
+  TaskConstMeta get kCrateApiLanceStoreNativeChunkStoreOpenConstMeta =>
       const TaskConstMeta(
-        debugName: "NativeVectorIndex_search",
-        argNames: ["that", "query", "k", "allowlist"],
+        debugName: "NativeChunkStore_open",
+        argNames: ["path", "dim"],
       );
 
   @override
-  Future<void> crateApiVectorIndexNativeVectorIndexWrite({
-    required NativeVectorIndex that,
-    required String path,
+  Future<List<RustChunkRow>> crateApiLanceStoreNativeChunkStorePageChunks({
+    required NativeChunkStore that,
+    required String docId,
+    required int page,
+    required int limit,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
             that,
             serializer,
           );
-          sse_encode_String(path, serializer);
+          sse_encode_String(docId, serializer);
+          sse_encode_i_32(page, serializer);
+          sse_encode_CastedPrimitive_usize(limit, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -443,20 +450,98 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
+          decodeSuccessData: sse_decode_list_rust_chunk_row,
           decodeErrorData: sse_decode_String,
         ),
-        constMeta: kCrateApiVectorIndexNativeVectorIndexWriteConstMeta,
-        argValues: [that, path],
+        constMeta: kCrateApiLanceStoreNativeChunkStorePageChunksConstMeta,
+        argValues: [that, docId, page, limit],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiVectorIndexNativeVectorIndexWriteConstMeta =>
+  TaskConstMeta get kCrateApiLanceStoreNativeChunkStorePageChunksConstMeta =>
       const TaskConstMeta(
-        debugName: "NativeVectorIndex_write",
-        argNames: ["that", "path"],
+        debugName: "NativeChunkStore_page_chunks",
+        argNames: ["that", "docId", "page", "limit"],
+      );
+
+  @override
+  Future<int> crateApiLanceStoreNativeChunkStoreRetainDocs({
+    required NativeChunkStore that,
+    required List<String> docIds,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
+            that,
+            serializer,
+          );
+          sse_encode_list_String(docIds, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 9,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_CastedPrimitive_usize,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiLanceStoreNativeChunkStoreRetainDocsConstMeta,
+        argValues: [that, docIds],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiLanceStoreNativeChunkStoreRetainDocsConstMeta =>
+      const TaskConstMeta(
+        debugName: "NativeChunkStore_retain_docs",
+        argNames: ["that", "docIds"],
+      );
+
+  @override
+  Future<List<RustChunkHit>> crateApiLanceStoreNativeChunkStoreSearch({
+    required NativeChunkStore that,
+    required List<double> query,
+    required int k,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
+            that,
+            serializer,
+          );
+          sse_encode_list_prim_f_32_loose(query, serializer);
+          sse_encode_CastedPrimitive_usize(k, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 10,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_rust_chunk_hit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiLanceStoreNativeChunkStoreSearchConstMeta,
+        argValues: [that, query, k],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiLanceStoreNativeChunkStoreSearchConstMeta =>
+      const TaskConstMeta(
+        debugName: "NativeChunkStore_search",
+        argNames: ["that", "query", "k"],
       );
 
   @override
@@ -479,7 +564,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 11,
             port: port_,
           );
         },
@@ -508,7 +593,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 12,
             port: port_,
           );
         },
@@ -542,7 +627,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 13,
             port: port_,
           );
         },
@@ -563,45 +648,29 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   RustArcIncrementStrongCountFnType
-  get rust_arc_increment_strong_count_NativeVectorIndex => wire
-      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex;
+  get rust_arc_increment_strong_count_NativeChunkStore => wire
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore;
 
   RustArcDecrementStrongCountFnType
-  get rust_arc_decrement_strong_count_NativeVectorIndex => wire
-      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex;
+  get rust_arc_decrement_strong_count_NativeChunkStore => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore;
 
   @protected
-  NativeVectorIndex
-  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  NativeChunkStore
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return NativeVectorIndexImpl.frbInternalDcoDecode(raw as List<dynamic>);
+    return NativeChunkStoreImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
-  NativeVectorIndex
-  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  NativeChunkStore
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return NativeVectorIndexImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
-  int dco_decode_CastedPrimitive_i_64(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    throw UnimplementedError(
-      'Not implemented in this codec, please use the other one',
-    );
-  }
-
-  @protected
-  int dco_decode_CastedPrimitive_u_64(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    throw UnimplementedError(
-      'Not implemented in this codec, please use the other one',
-    );
+    return NativeChunkStoreImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -613,24 +682,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  NativeVectorIndex
-  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  NativeChunkStore
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return NativeVectorIndexImpl.frbInternalDcoDecode(raw as List<dynamic>);
+    return NativeChunkStoreImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
   String dco_decode_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as String;
-  }
-
-  @protected
-  bool dco_decode_bool(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw as bool;
   }
 
   @protected
@@ -646,15 +709,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PlatformInt64 dco_decode_i_64(dynamic raw) {
+  List<String> dco_decode_list_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dcoDecodeI64(raw);
-  }
-
-  @protected
-  List<int> dco_decode_list_CastedPrimitive_u_64(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return (raw as List<dynamic>).map(dco_decode_CastedPrimitive_u_64).toList();
+    return (raw as List<dynamic>).map(dco_decode_String).toList();
   }
 
   @protected
@@ -682,15 +739,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  List<RustPaperChunk> dco_decode_list_rust_paper_chunk(dynamic raw) {
+  List<RustChunkHit> dco_decode_list_rust_chunk_hit(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return (raw as List<dynamic>).map(dco_decode_rust_paper_chunk).toList();
+    return (raw as List<dynamic>).map(dco_decode_rust_chunk_hit).toList();
   }
 
   @protected
-  List<RustSearchResult> dco_decode_list_rust_search_result(dynamic raw) {
+  List<RustChunkRow> dco_decode_list_rust_chunk_row(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return (raw as List<dynamic>).map(dco_decode_rust_search_result).toList();
+    return (raw as List<dynamic>).map(dco_decode_rust_chunk_row).toList();
+  }
+
+  @protected
+  List<RustPaperChunk> dco_decode_list_rust_paper_chunk(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_rust_paper_chunk).toList();
   }
 
   @protected
@@ -700,26 +763,49 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  List<int>? dco_decode_opt_list_CastedPrimitive_u_64(dynamic raw) {
+  RustChunkHit dco_decode_rust_chunk_hit(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null ? null : dco_decode_list_CastedPrimitive_u_64(raw);
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return RustChunkHit(
+      row: dco_decode_rust_chunk_row(arr[0]),
+      score: dco_decode_f_32(arr[1]),
+    );
   }
 
   @protected
-  RustPaperChunk dco_decode_rust_paper_chunk(dynamic raw) {
+  RustChunkRow dco_decode_rust_chunk_row(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
     if (arr.length != 8)
       throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
-    return RustPaperChunk(
-      id: dco_decode_String(arr[0]),
-      vectorId: dco_decode_CastedPrimitive_i_64(arr[1]),
+    return RustChunkRow(
+      chunkId: dco_decode_String(arr[0]),
+      docId: dco_decode_String(arr[1]),
       page: dco_decode_i_32(arr[2]),
       ordinal: dco_decode_i_32(arr[3]),
       section: dco_decode_String(arr[4]),
       startChar: dco_decode_i_32(arr[5]),
       endChar: dco_decode_i_32(arr[6]),
       text: dco_decode_String(arr[7]),
+    );
+  }
+
+  @protected
+  RustPaperChunk dco_decode_rust_paper_chunk(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return RustPaperChunk(
+      id: dco_decode_String(arr[0]),
+      page: dco_decode_i_32(arr[1]),
+      ordinal: dco_decode_i_32(arr[2]),
+      section: dco_decode_String(arr[3]),
+      startChar: dco_decode_i_32(arr[4]),
+      endChar: dco_decode_i_32(arr[5]),
+      text: dco_decode_String(arr[6]),
     );
   }
 
@@ -737,24 +823,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       pdfType: dco_decode_String(arr[4]),
       needsOcrPages: dco_decode_list_prim_i_32_strict(arr[5]),
     );
-  }
-
-  @protected
-  RustSearchResult dco_decode_rust_search_result(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 2)
-      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
-    return RustSearchResult(
-      vectorId: dco_decode_CastedPrimitive_u_64(arr[0]),
-      score: dco_decode_f_32(arr[1]),
-    );
-  }
-
-  @protected
-  BigInt dco_decode_u_64(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dcoDecodeU64(raw);
   }
 
   @protected
@@ -776,41 +844,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  NativeVectorIndex
-  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  NativeChunkStore
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    return NativeVectorIndexImpl.frbInternalSseDecode(
+    return NativeChunkStoreImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
   }
 
   @protected
-  NativeVectorIndex
-  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  NativeChunkStore
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    return NativeVectorIndexImpl.frbInternalSseDecode(
+    return NativeChunkStoreImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
-  }
-
-  @protected
-  int sse_decode_CastedPrimitive_i_64(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var inner = sse_decode_i_64(deserializer);
-    return inner.toInt();
-  }
-
-  @protected
-  int sse_decode_CastedPrimitive_u_64(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var inner = sse_decode_u_64(deserializer);
-    return inner.toInt();
   }
 
   @protected
@@ -821,12 +875,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  NativeVectorIndex
-  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
+  NativeChunkStore
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    return NativeVectorIndexImpl.frbInternalSseDecode(
+    return NativeChunkStoreImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
@@ -837,12 +891,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_list_prim_u_8_strict(deserializer);
     return utf8.decoder.convert(inner);
-  }
-
-  @protected
-  bool sse_decode_bool(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getUint8() != 0;
   }
 
   @protected
@@ -858,19 +906,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getPlatformInt64();
-  }
-
-  @protected
-  List<int> sse_decode_list_CastedPrimitive_u_64(SseDeserializer deserializer) {
+  List<String> sse_decode_list_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
     var len_ = sse_decode_i_32(deserializer);
-    var ans_ = <int>[];
+    var ans_ = <String>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
-      ans_.add(sse_decode_CastedPrimitive_u_64(deserializer));
+      ans_.add(sse_decode_String(deserializer));
     }
     return ans_;
   }
@@ -904,6 +946,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<RustChunkHit> sse_decode_list_rust_chunk_hit(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <RustChunkHit>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_rust_chunk_hit(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<RustChunkRow> sse_decode_list_rust_chunk_row(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <RustChunkRow>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_rust_chunk_row(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<RustPaperChunk> sse_decode_list_rust_paper_chunk(
     SseDeserializer deserializer,
   ) {
@@ -913,20 +983,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <RustPaperChunk>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_rust_paper_chunk(deserializer));
-    }
-    return ans_;
-  }
-
-  @protected
-  List<RustSearchResult> sse_decode_list_rust_search_result(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    var len_ = sse_decode_i_32(deserializer);
-    var ans_ = <RustSearchResult>[];
-    for (var idx_ = 0; idx_ < len_; ++idx_) {
-      ans_.add(sse_decode_rust_search_result(deserializer));
     }
     return ans_;
   }
@@ -943,23 +999,40 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  List<int>? sse_decode_opt_list_CastedPrimitive_u_64(
-    SseDeserializer deserializer,
-  ) {
+  RustChunkHit sse_decode_rust_chunk_hit(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_row = sse_decode_rust_chunk_row(deserializer);
+    var var_score = sse_decode_f_32(deserializer);
+    return RustChunkHit(row: var_row, score: var_score);
+  }
 
-    if (sse_decode_bool(deserializer)) {
-      return (sse_decode_list_CastedPrimitive_u_64(deserializer));
-    } else {
-      return null;
-    }
+  @protected
+  RustChunkRow sse_decode_rust_chunk_row(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_chunkId = sse_decode_String(deserializer);
+    var var_docId = sse_decode_String(deserializer);
+    var var_page = sse_decode_i_32(deserializer);
+    var var_ordinal = sse_decode_i_32(deserializer);
+    var var_section = sse_decode_String(deserializer);
+    var var_startChar = sse_decode_i_32(deserializer);
+    var var_endChar = sse_decode_i_32(deserializer);
+    var var_text = sse_decode_String(deserializer);
+    return RustChunkRow(
+      chunkId: var_chunkId,
+      docId: var_docId,
+      page: var_page,
+      ordinal: var_ordinal,
+      section: var_section,
+      startChar: var_startChar,
+      endChar: var_endChar,
+      text: var_text,
+    );
   }
 
   @protected
   RustPaperChunk sse_decode_rust_paper_chunk(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_id = sse_decode_String(deserializer);
-    var var_vectorId = sse_decode_CastedPrimitive_i_64(deserializer);
     var var_page = sse_decode_i_32(deserializer);
     var var_ordinal = sse_decode_i_32(deserializer);
     var var_section = sse_decode_String(deserializer);
@@ -968,7 +1041,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_text = sse_decode_String(deserializer);
     return RustPaperChunk(
       id: var_id,
-      vectorId: var_vectorId,
       page: var_page,
       ordinal: var_ordinal,
       section: var_section,
@@ -1000,20 +1072,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  RustSearchResult sse_decode_rust_search_result(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_vectorId = sse_decode_CastedPrimitive_u_64(deserializer);
-    var var_score = sse_decode_f_32(deserializer);
-    return RustSearchResult(vectorId: var_vectorId, score: var_score);
-  }
-
-  @protected
-  BigInt sse_decode_u_64(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getBigUint64();
-  }
-
-  @protected
   int sse_decode_u_8(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8();
@@ -1031,41 +1089,35 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  bool sse_decode_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint8() != 0;
+  }
+
+  @protected
   void
-  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
-    NativeVectorIndex self,
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
+    NativeChunkStore self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
-      (self as NativeVectorIndexImpl).frbInternalSseEncode(move: true),
+      (self as NativeChunkStoreImpl).frbInternalSseEncode(move: true),
       serializer,
     );
   }
 
   @protected
   void
-  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
-    NativeVectorIndex self,
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
+    NativeChunkStore self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
-      (self as NativeVectorIndexImpl).frbInternalSseEncode(move: false),
+      (self as NativeChunkStoreImpl).frbInternalSseEncode(move: false),
       serializer,
     );
-  }
-
-  @protected
-  void sse_encode_CastedPrimitive_i_64(int self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_i_64(sseEncodeCastedPrimitiveI64(self), serializer);
-  }
-
-  @protected
-  void sse_encode_CastedPrimitive_u_64(int self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_u_64(sseEncodeCastedPrimitiveU64(self), serializer);
   }
 
   @protected
@@ -1076,13 +1128,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
-  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
-    NativeVectorIndex self,
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeChunkStore(
+    NativeChunkStore self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
-      (self as NativeVectorIndexImpl).frbInternalSseEncode(move: null),
+      (self as NativeChunkStoreImpl).frbInternalSseEncode(move: null),
       serializer,
     );
   }
@@ -1091,12 +1143,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_String(String self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_prim_u_8_strict(utf8.encoder.convert(self), serializer);
-  }
-
-  @protected
-  void sse_encode_bool(bool self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putUint8(self ? 1 : 0);
   }
 
   @protected
@@ -1112,20 +1158,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putPlatformInt64(self);
-  }
-
-  @protected
-  void sse_encode_list_CastedPrimitive_u_64(
-    List<int> self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_list_String(List<String> self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
-      sse_encode_CastedPrimitive_u_64(item, serializer);
+      sse_encode_String(item, serializer);
     }
   }
 
@@ -1172,6 +1209,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_rust_chunk_hit(
+    List<RustChunkHit> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_rust_chunk_hit(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_rust_chunk_row(
+    List<RustChunkRow> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_rust_chunk_row(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_rust_paper_chunk(
     List<RustPaperChunk> self,
     SseSerializer serializer,
@@ -1180,18 +1241,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_rust_paper_chunk(item, serializer);
-    }
-  }
-
-  @protected
-  void sse_encode_list_rust_search_result(
-    List<RustSearchResult> self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_i_32(self.length, serializer);
-    for (final item in self) {
-      sse_encode_rust_search_result(item, serializer);
     }
   }
 
@@ -1206,16 +1255,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_opt_list_CastedPrimitive_u_64(
-    List<int>? self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_rust_chunk_hit(RustChunkHit self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_rust_chunk_row(self.row, serializer);
+    sse_encode_f_32(self.score, serializer);
+  }
 
-    sse_encode_bool(self != null, serializer);
-    if (self != null) {
-      sse_encode_list_CastedPrimitive_u_64(self, serializer);
-    }
+  @protected
+  void sse_encode_rust_chunk_row(RustChunkRow self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.chunkId, serializer);
+    sse_encode_String(self.docId, serializer);
+    sse_encode_i_32(self.page, serializer);
+    sse_encode_i_32(self.ordinal, serializer);
+    sse_encode_String(self.section, serializer);
+    sse_encode_i_32(self.startChar, serializer);
+    sse_encode_i_32(self.endChar, serializer);
+    sse_encode_String(self.text, serializer);
   }
 
   @protected
@@ -1225,7 +1281,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.id, serializer);
-    sse_encode_CastedPrimitive_i_64(self.vectorId, serializer);
     sse_encode_i_32(self.page, serializer);
     sse_encode_i_32(self.ordinal, serializer);
     sse_encode_String(self.section, serializer);
@@ -1249,22 +1304,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_rust_search_result(
-    RustSearchResult self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_CastedPrimitive_u_64(self.vectorId, serializer);
-    sse_encode_f_32(self.score, serializer);
-  }
-
-  @protected
-  void sse_encode_u_64(BigInt self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putBigUint64(self);
-  }
-
-  @protected
   void sse_encode_u_8(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self);
@@ -1280,62 +1319,97 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putBigUint64(self);
   }
+
+  @protected
+  void sse_encode_bool(bool self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint8(self ? 1 : 0);
+  }
 }
 
 @sealed
-class NativeVectorIndexImpl extends RustOpaque implements NativeVectorIndex {
+class NativeChunkStoreImpl extends RustOpaque implements NativeChunkStore {
   // Not to be used by end users
-  NativeVectorIndexImpl.frbInternalDcoDecode(List<dynamic> wire)
+  NativeChunkStoreImpl.frbInternalDcoDecode(List<dynamic> wire)
     : super.frbInternalDcoDecode(wire, _kStaticData);
 
   // Not to be used by end users
-  NativeVectorIndexImpl.frbInternalSseDecode(
+  NativeChunkStoreImpl.frbInternalSseDecode(
     BigInt ptr,
     int externalSizeOnNative,
   ) : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
 
   static final _kStaticData = RustArcStaticData(
     rustArcIncrementStrongCount:
-        RustLib.instance.api.rust_arc_increment_strong_count_NativeVectorIndex,
+        RustLib.instance.api.rust_arc_increment_strong_count_NativeChunkStore,
     rustArcDecrementStrongCount:
-        RustLib.instance.api.rust_arc_decrement_strong_count_NativeVectorIndex,
+        RustLib.instance.api.rust_arc_decrement_strong_count_NativeChunkStore,
     rustArcDecrementStrongCountPtr: RustLib
         .instance
         .api
-        .rust_arc_decrement_strong_count_NativeVectorIndexPtr,
+        .rust_arc_decrement_strong_count_NativeChunkStorePtr,
   );
 
-  Future<void> addBatch({
-    required List<int> ids,
+  /// Appends `rows` with their flattened `vectors` in a single transaction.
+  Future<void> add({
+    required List<RustChunkRow> rows,
     required List<double> vectors,
-    required int dim,
-  }) => RustLib.instance.api.crateApiVectorIndexNativeVectorIndexAddBatch(
+  }) => RustLib.instance.api.crateApiLanceStoreNativeChunkStoreAdd(
     that: this,
-    ids: ids,
+    rows: rows,
     vectors: vectors,
-    dim: dim,
   );
+
+  /// Compacts fragments and prunes superseded versions.
+  ///
+  /// Every append and delete creates a new dataset version, and Lance keeps
+  /// them until told otherwise, so this runs after each import.
+  Future<void> compact() => RustLib.instance.api
+      .crateApiLanceStoreNativeChunkStoreCompact(that: this);
+
+  Future<int> count() =>
+      RustLib.instance.api.crateApiLanceStoreNativeChunkStoreCount(that: this);
+
+  /// Removes every row belonging to one document.
+  Future<void> deleteDoc({required String docId}) => RustLib.instance.api
+      .crateApiLanceStoreNativeChunkStoreDeleteDoc(that: this, docId: docId);
 
   Future<int> dim() =>
-      RustLib.instance.api.crateApiVectorIndexNativeVectorIndexDim(that: this);
+      RustLib.instance.api.crateApiLanceStoreNativeChunkStoreDim(that: this);
 
-  Future<int> len() =>
-      RustLib.instance.api.crateApiVectorIndexNativeVectorIndexLen(that: this);
+  /// Distinct document ids currently in the table.
+  Future<List<String>> docIds() =>
+      RustLib.instance.api.crateApiLanceStoreNativeChunkStoreDocIds(that: this);
 
-  Future<bool> remove({required int id}) => RustLib.instance.api
-      .crateApiVectorIndexNativeVectorIndexRemove(that: this, id: id);
+  /// Non-vector scan of one page of one document, ordered by chunk ordinal.
+  Future<List<RustChunkRow>> pageChunks({
+    required String docId,
+    required int page,
+    required int limit,
+  }) => RustLib.instance.api.crateApiLanceStoreNativeChunkStorePageChunks(
+    that: this,
+    docId: docId,
+    page: page,
+    limit: limit,
+  );
 
-  Future<List<RustSearchResult>> search({
+  /// Removes rows whose document is not in `doc_ids`, returning the number of
+  /// documents dropped. This is the orphan sweep that replaces the old
+  /// dirty/clean index-state protocol.
+  ///
+  /// Nothing is written when there is nothing stale — every write would
+  /// otherwise append a dataset version on each app start.
+  Future<int> retainDocs({required List<String> docIds}) => RustLib.instance.api
+      .crateApiLanceStoreNativeChunkStoreRetainDocs(that: this, docIds: docIds);
+
+  /// Exact cosine search. Embeddings are L2-normalized by the caller, so the
+  /// returned score is the cosine similarity.
+  Future<List<RustChunkHit>> search({
     required List<double> query,
     required int k,
-    List<int>? allowlist,
-  }) => RustLib.instance.api.crateApiVectorIndexNativeVectorIndexSearch(
+  }) => RustLib.instance.api.crateApiLanceStoreNativeChunkStoreSearch(
     that: this,
     query: query,
     k: k,
-    allowlist: allowlist,
   );
-
-  Future<void> write({required String path}) => RustLib.instance.api
-      .crateApiVectorIndexNativeVectorIndexWrite(that: this, path: path);
 }

@@ -9,7 +9,6 @@ pub const OVERLAP_CHARS: usize = 300;
 #[derive(Clone, Debug, PartialEq)]
 pub struct RustPaperChunk {
     pub id: String,
-    pub vector_id: i64,
     pub page: i32,
     pub ordinal: i32,
     pub section: String,
@@ -148,7 +147,6 @@ pub fn chunk_text(
     if text_len <= CEILING_CHUNK_CHARS {
         chunks.push(RustPaperChunk {
             id: format!("{document_id}:p{page_num}:c0"),
-            vector_id: 0,
             page: page_num,
             ordinal: start_ordinal,
             section: section.to_string(),
@@ -217,7 +215,6 @@ pub fn chunk_text(
         if !chunk_content.trim().is_empty() {
             chunks.push(RustPaperChunk {
                 id: format!("{document_id}:p{page_num}:c{chunk_idx}"),
-                vector_id: 0,
                 page: page_num,
                 ordinal: start_ordinal + chunk_idx,
                 section: section.to_string(),

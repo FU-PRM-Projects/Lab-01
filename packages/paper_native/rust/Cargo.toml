@@ -10,8 +10,19 @@ crate-type = ["cdylib", "staticlib"]
 flutter_rust_bridge = "=2.13.0"
 pdf-inspector = "1.19.0"
 regex = "1.10"
-byteorder = "1.5"
-itertools = "0.15"
+arrow-array = "58.4"
+arrow-schema = "58.4"
+futures = "0.3"
+tokio = { version = "1", features = ["rt-multi-thread"] }
+lancedb = { version = "0.39.0", features = ["remote"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+
+[dev-dependencies]
+tempfile = "3"
+
+# No [profile.release] tuning is applied. `strip` is a no-op on windows-msvc
+# (debug info lives in a separate .pdb), and `panic = "abort"` must never be set:
+# flutter_rust_bridge relies on unwinding to turn Rust panics into Dart
+# exceptions. LTO would trade a much longer build for a smaller DLL; untried.
