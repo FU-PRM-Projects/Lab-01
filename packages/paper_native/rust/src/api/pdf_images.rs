@@ -236,9 +236,12 @@ fn decode_image(doc: &Document, stream: &Stream) -> Option<(String, Vec<u8>)> {
                     pixel[2] as u32,
                     pixel[3] as u32,
                 );
-                rgb.push((c * k / 255) as u8);
-                rgb.push((m * k / 255) as u8);
-                rgb.push((y * k / 255) as u8);
+                // DeviceCMYK samples are ink amounts: 0 means no ink, so each
+                // component is complemented before the black plate is applied.
+                // Multiplying the ink amounts directly turns white into black.
+                rgb.push(((255 - c) * (255 - k) / 255) as u8);
+                rgb.push(((255 - m) * (255 - k) / 255) as u8);
+                rgb.push(((255 - y) * (255 - k) / 255) as u8);
             }
             (ColorType::Rgb8, rgb)
         }

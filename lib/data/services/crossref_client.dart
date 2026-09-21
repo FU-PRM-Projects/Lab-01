@@ -92,6 +92,10 @@ class CrossrefClient {
   static const String _userAgent =
       'PaperChat/1.0 (research reference resolver)';
 
+  /// Per-request ceiling. Entries are resolved one at a time, so this also
+  /// bounds how long a stalled endpoint can hold up one bibliography entry.
+  static const Duration _requestTimeout = Duration(seconds: 20);
+
   /// Below this Crossref score a "match" is usually a different paper.
   static const double minimumScore = 55;
 
@@ -120,10 +124,17 @@ class CrossrefClient {
       },
     );
 
-    final response = await _client.get(
-      uri,
-      headers: const {'User-Agent': _userAgent, 'Accept': 'application/json'},
-    );
+    // Crossref can accept the connection and then stall; without a bound the
+    // bibliography stays in the resolving state for as long as it does.
+    final response = await _client
+        .get(
+          uri,
+          headers: const {
+            'User-Agent': _userAgent,
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(_requestTimeout);
     if (response.statusCode != 200) {
       throw http.ClientException(
         'Crossref responded ${response.statusCode}',
@@ -131,14 +142,28 @@ class CrossrefClient {
       );
     }
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    final items =
-        ((body['message'] as Map<String, dynamic>?)?['items']
-            as List<dynamic>?) ??
-        const [];
+    // A response that does not carry a message/items envelope is a broken
+    // endpoint, not a paper Crossref does not know about. Reporting it as
+    // "no match" would hide an outage behind an empty bibliography.
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw http.ClientException('Crossref returned a malformed body', uri);
+    }
+    final message = decoded['message'];
+    if (message is! Map<String, dynamic> || message['items'] is! List) {
+      throw http.ClientException(
+        'Crossref returned an unexpected response shape',
+        uri,
+      );
+    }
+    final items = message['items'] as List<dynamic>;
     if (items.isEmpty) return null;
 
-    final match = CrossrefMatch.fromJson(items.first as Map<String, dynamic>);
+    final first = items.first;
+    if (first is! Map<String, dynamic>) {
+      throw http.ClientException('Crossref returned an unexpected item', uri);
+    }
+    final match = CrossrefMatch.fromJson(first);
     if (match.doi.isEmpty || match.score < minimumScore) return null;
     return match;
   }
@@ -150,16 +175,26 @@ class CrossrefClient {
   }) async {
     final results = <int, CrossrefMatch>{};
     var done = 0;
+    var attempted = 0;
+    var failed = 0;
+    Object? lastError;
     for (final entry in entries.entries) {
       if (_closed) break;
+      attempted++;
       try {
         final match = await resolve(entry.value);
         if (match != null) results[entry.key] = match;
-      } catch (_) {
+      } catch (error) {
         // One unresolvable entry must not abort the whole bibliography.
+        failed++;
+        lastError = error;
       }
       onProgress?.call(++done, entries.length);
     }
+    // Every entry failing is an outage or a broken endpoint rather than a
+    // bibliography Crossref happens not to know, so the caller hears about it
+    // instead of being handed an empty result that looks like success.
+    if (attempted > 0 && failed == attempted) throw lastError!;
     return results;
   }
 

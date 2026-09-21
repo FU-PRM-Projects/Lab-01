@@ -46,7 +46,7 @@ Views render state and handle UI actions; controllers coordinate operations. `Pa
    remembers each page's span, so any character offset maps back to a page. A
    second view interleaves `<!-- PAGE N -->` markers for the model.
 3. **Analyze.** `InstructDocumentService` asks the indexing model
-   (`qwen/qwen3-235b-a22b-2507` by default, text-only with 262K context) for
+   (`z-ai/glm-5.3-flashx` by default, text-only with long context) for
    the paper's title, authors and outline. It returns *headings and page
    numbers*, never body text, so nothing the model writes can end up in the
    indexed content.

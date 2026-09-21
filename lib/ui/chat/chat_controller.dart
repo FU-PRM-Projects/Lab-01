@@ -233,7 +233,9 @@ class ChatController extends StateNotifier<ChatState> {
     final generation = ++_generation;
     _releaseRequests();
     if (!mounted) return;
-    if (turn != null && turn.text.isNotEmpty) {
+    // A turn that ran tools and then failed still has a record worth keeping,
+    // so an empty answer is saved when there is tool activity behind it.
+    if (turn != null && (turn.text.isNotEmpty || turn.toolCalls.isNotEmpty)) {
       final updated = turn.chat.copyWith(
         updatedAt: DateTime.now().toUtc(),
         messages: [

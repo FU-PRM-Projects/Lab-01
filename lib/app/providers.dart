@@ -35,8 +35,10 @@ class DataDirectoryController {
       return;
     }
 
-    // Release lock on current directory
-    currentStorage.dispose();
+    // The replacement is opened before anything is given up: disposing first
+    // would leave the provider holding released storage, and the new path
+    // persisted, if the target turns out to be unusable.
+    final newStorage = await LocalStorage.createForDirectory(newDir);
 
     final defaultDir = await LocalStorage.getDefaultDataDirectory();
     if (p.normalize(newDir.path) == p.normalize(defaultDir.path)) {
@@ -45,7 +47,8 @@ class DataDirectoryController {
       await LocalStorage.setCustomDataDirectoryPath(newDir.path);
     }
 
-    final newStorage = await LocalStorage.createForDirectory(newDir);
+    // Release the lock on the old directory only once the swap is certain.
+    currentStorage.dispose();
     _ref.read(storageStateProvider.notifier).state = newStorage;
 
     // Load settings and collections for the new directory

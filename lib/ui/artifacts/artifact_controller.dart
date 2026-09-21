@@ -224,9 +224,7 @@ class ResolvedReferencesNotifier
     );
   }
 
-  Future<void> _saveCache() async {
-    final collectionId = _collectionId;
-    if (collectionId == null) return;
+  Future<void> _saveCache(String collectionId) async {
     await _ref.read(localStorageProvider).saveResolvedReferences(
       collectionId,
       _documentId,
@@ -256,6 +254,12 @@ class ResolvedReferencesNotifier
     }
     if (pending.isEmpty) return;
 
+    // This provider is keyed by document alone, so the collection is captured
+    // before the first await: switching collections mid-resolution would
+    // otherwise file this paper's matches under the collection now selected.
+    final collectionId = _collectionId;
+    if (collectionId == null) return;
+
     state = state.copyWith(
       isResolving: true,
       resolvedCount: 0,
@@ -283,7 +287,7 @@ class ResolvedReferencesNotifier
         },
         isResolving: false,
       );
-      await _saveCache();
+      await _saveCache(collectionId);
     } catch (error) {
       if (mounted) {
         state = state.copyWith(

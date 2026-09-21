@@ -1151,8 +1151,13 @@ class _ReferenceRow extends StatelessWidget {
 
   Future<void> _open(BuildContext context, String url) async {
     final uri = Uri.tryParse(url);
-    if (uri == null) return;
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    // Reference URLs come out of imported documents, so only the web schemes
+    // are handed to the OS; a file: or custom-protocol link in a bibliography
+    // would otherwise invoke a registered handler on click.
+    final isWeb =
+        uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+    final launched =
+        isWeb && await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

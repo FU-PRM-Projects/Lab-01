@@ -131,6 +131,9 @@ class ResearchAgent {
       final papers = await storage.listPapers(collectionId);
       if (_isCancelled) return;
       final evidence = _Evidence({for (final paper in papers) paper.id: paper});
+      // Source IDs whose image has already gone to the model, so a figure a
+      // later tool call surfaces is attached once and only once.
+      final sentFigures = <String>{};
       final initialEvidence = evidence.register(chunks);
       yield SourcesUpdated(Map.unmodifiable(evidence.sources));
 
@@ -146,7 +149,7 @@ Available evidence:
 $initialEvidence
 '''),
         ..._history(previousMessages),
-        ...await _figureMessages(collectionId, evidence),
+        ...await _figureMessages(collectionId, evidence, sentFigures),
         ChatMessage.humanText(userQuestion),
       ];
       final url = AppSettings(
@@ -242,6 +245,15 @@ $initialEvidence
             ChatMessage.tool(toolCallId: call.id, content: result),
           );
         }
+        // Tool results announce their figures as attached images, so the
+        // images for anything newly cited go in before the next request.
+        final newFigures = await _figureMessages(
+          collectionId,
+          evidence,
+          sentFigures,
+        );
+        if (_isCancelled) return;
+        conversation.addAll(newFigures);
       }
       if (!_isCancelled) {
         yield ChatDone(
@@ -337,14 +349,29 @@ $initialEvidence
   ///
   /// A figure whose file cannot be read is skipped: its caption is already in
   /// the evidence block, so the answer degrades rather than failing.
+  ///
+  /// Called again after every round of tool results, since a later
+  /// `search_papers` or `read_page` can cite a figure the opening retrieval
+  /// never saw. [sent] carries the source IDs already attached and grows here,
+  /// so no image is paid for twice and the budget spans the whole turn.
   Future<List<ChatMessage>> _figureMessages(
     String collectionId,
     _Evidence evidence,
+    Set<String> sent,
   ) async {
-    if (evidence.figures.isEmpty) return const [];
+    final budget = _maxAttachedFigures - sent.length;
+    if (budget <= 0) return const [];
+    final pending = evidence.figures
+        .where((figure) => !sent.contains(figure.sourceId))
+        .take(budget)
+        .toList();
+    if (pending.isEmpty) return const [];
 
     final parts = <ChatMessageContent>[];
-    for (final figure in evidence.figures.take(_maxAttachedFigures)) {
+    for (final figure in pending) {
+      // Counted as sent either way: a figure whose file will not open now is
+      // not going to open on the next step either.
+      sent.add(figure.sourceId);
       final name = figure.chunk.imagePath;
       if (name == null) continue;
       final file = File(
