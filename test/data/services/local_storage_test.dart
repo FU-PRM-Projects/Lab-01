@@ -8,16 +8,20 @@ import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/data/services/local_storage.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('LocalStorage Tests', () {
     late Directory tempDir;
     late LocalStorage storage;
 
     setUp(() async {
       tempDir = Directory.systemTemp.createTempSync('storage_test');
+      LocalStorage.overrideAppSupportDir = tempDir;
       storage = LocalStorage(rootDir: tempDir);
     });
 
     tearDown(() {
+      LocalStorage.overrideAppSupportDir = null;
       try {
         tempDir.deleteSync(recursive: true);
       } catch (_) {}
@@ -156,6 +160,59 @@ void main() {
         tempDir.listSync().where((file) => file.path.contains('.tmp_')),
         isEmpty,
       );
+    });
+
+    test('Custom data directory persistence and resolution', () async {
+      final customDir = Directory.systemTemp.createTempSync('custom_data_dir');
+      addTearDown(() {
+        try {
+          customDir.deleteSync(recursive: true);
+        } catch (_) {}
+      });
+
+      // Initially, custom path is null or whatever was set; setting custom path persists it
+      await LocalStorage.setCustomDataDirectoryPath(customDir.path);
+      expect(await LocalStorage.getCustomDataDirectoryPath(), equals(customDir.path));
+
+      // Resolves to custom path when overrideDir is not provided
+      final resolved = await LocalStorage.resolveDataDirectory();
+      expect(resolved.path, equals(customDir.path));
+
+      // Override takes precedence
+      final overrideDir = Directory.systemTemp.createTempSync('override_dir');
+      addTearDown(() {
+        try {
+          overrideDir.deleteSync(recursive: true);
+        } catch (_) {}
+      });
+      final resolvedOverride = await LocalStorage.resolveDataDirectory(overrideDir);
+      expect(resolvedOverride.path, equals(overrideDir.path));
+
+      // Reset to default (null) clears the custom path
+      await LocalStorage.setCustomDataDirectoryPath(null);
+      expect(await LocalStorage.getCustomDataDirectoryPath(), isNull);
+
+      final defaultDir = await LocalStorage.getDefaultDataDirectory();
+      final resolvedDefault = await LocalStorage.resolveDataDirectory();
+      expect(resolvedDefault.path, equals(defaultDir.path));
+    });
+
+    test('LocalStorage.createForDirectory initializes directory structure', () async {
+      final newDir = Directory.systemTemp.createTempSync('new_storage_dir');
+      addTearDown(() {
+        try {
+          newDir.deleteSync(recursive: true);
+        } catch (_) {}
+      });
+
+      final newStorage = await LocalStorage.createForDirectory(newDir);
+      addTearDown(newStorage.dispose);
+
+      expect(newStorage.rootDir.path, equals(newDir.path));
+      expect(newDir.existsSync(), isTrue);
+
+      final settings = await newStorage.loadSettings();
+      expect(settings, isNotNull);
     });
   });
 }

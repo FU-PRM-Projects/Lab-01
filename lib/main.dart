@@ -30,12 +30,12 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [
-        localStorageProvider.overrideWith((ref) {
+        storageStateProvider.overrideWith((ref) {
           ref.onDispose(storage.dispose);
           return storage;
         }),
         settingsProvider.overrideWith(
-          (ref) => SettingsNotifier(storage, settings),
+          (ref) => SettingsNotifier(ref.watch(localStorageProvider), settings),
         ),
         currentCollectionProvider.overrideWith((ref) => initialCollection),
       ],

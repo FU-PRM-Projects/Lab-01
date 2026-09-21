@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import 'package:lab_05/data/models/app_settings.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,10 +13,71 @@ import 'package:lab_05/data/models/collection.dart';
 import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/data/services/local_storage.dart';
 
+// Storage State Provider (internal)
+final storageStateProvider = StateProvider<LocalStorage?>((ref) => null);
+
 // Storage Provider
 final localStorageProvider = Provider<LocalStorage>((ref) {
+  final stateStorage = ref.watch(storageStateProvider);
+  if (stateStorage != null) return stateStorage;
   throw UnimplementedError('Initialize localStorageProvider in main');
 });
+
+// Data Directory Controller
+class DataDirectoryController {
+  final Ref _ref;
+  DataDirectoryController(this._ref);
+
+  Future<void> changeDirectory(Directory newDir) async {
+    final currentStorage = _ref.read(localStorageProvider);
+    if (p.normalize(currentStorage.rootDir.path) == p.normalize(newDir.path)) {
+      return;
+    }
+
+    // Release lock on current directory
+    currentStorage.dispose();
+
+    final defaultDir = await LocalStorage.getDefaultDataDirectory();
+    if (p.normalize(newDir.path) == p.normalize(defaultDir.path)) {
+      await LocalStorage.setCustomDataDirectoryPath(null);
+    } else {
+      await LocalStorage.setCustomDataDirectoryPath(newDir.path);
+    }
+
+    final newStorage = await LocalStorage.createForDirectory(newDir);
+    _ref.read(storageStateProvider.notifier).state = newStorage;
+
+    // Load settings and collections for the new directory
+    final newSettings = await newStorage.loadSettings();
+    await _ref.read(settingsProvider.notifier).update(newSettings);
+    final collections = await newStorage.listCollections();
+    Collection? initial = collections.firstOrNull;
+    if (initial == null) {
+      initial = Collection(
+        id: 'col_lab_05',
+        name: 'lab_05',
+        createdAt: DateTime.now().toUtc(),
+        embeddingProfile: EmbeddingProfile(
+          id: 'profile_gemini_2',
+          model: newSettings.defaultEmbeddingModel,
+          dimensions: newSettings.defaultEmbeddingDimensions,
+        ),
+      );
+      await newStorage.saveCollection(initial);
+    }
+    _ref.read(currentCollectionProvider.notifier).state = initial;
+    _ref.read(activeCitationProvider.notifier).state = null;
+    _ref.read(currentChatProvider.notifier).state = null;
+  }
+
+  Future<void> resetToDefault() async {
+    final defaultDir = await LocalStorage.getDefaultDataDirectory();
+    await changeDirectory(defaultDir);
+  }
+}
+
+final dataDirectoryControllerProvider =
+    Provider<DataDirectoryController>((ref) => DataDirectoryController(ref));
 
 // Settings Provider
 class SettingsNotifier extends StateNotifier<AppSettings> {
@@ -113,7 +176,8 @@ class PapersNotifier extends StateNotifier<List<PaperDocument>> {
   final LocalStorage _storage;
   final String? _collectionId;
 
-  PapersNotifier(this._storage, this._collectionId) : super([]) {
+  PapersNotifier(this._storage, this._collectionId, [List<PaperDocument> initial = const []])
+      : super(initial) {
     refresh();
   }
 
@@ -137,21 +201,41 @@ class PapersNotifier extends StateNotifier<List<PaperDocument>> {
     await _storage.deletePaper(_collectionId, documentId);
     await refresh();
   }
+
+  Future<void> deletePaper(
+    String documentId,
+    PaperRepository repository,
+  ) async {
+    if (_collectionId == null) return;
+    await repository.deletePaper(documentId);
+    await refresh();
+  }
 }
 
-final papersProvider =
-    StateNotifierProvider<PapersNotifier, List<PaperDocument>>((ref) {
+final projectPapersProvider =
+    StateNotifierProvider.family<PapersNotifier, List<PaperDocument>, String>((
+      ref,
+      collectionId,
+    ) {
       final storage = ref.watch(localStorageProvider);
-      final currentCol = ref.watch(currentCollectionProvider);
-      return PapersNotifier(storage, currentCol?.id);
+      return PapersNotifier(storage, collectionId);
     });
+
+final papersProvider = Provider<List<PaperDocument>>((ref) {
+  final currentCol = ref.watch(currentCollectionProvider);
+  if (currentCol == null) return const [];
+  return ref.watch(projectPapersProvider(currentCol.id));
+});
+
+
 
 // Chats Notifier for current collection
 class ChatsNotifier extends StateNotifier<List<Chat>> {
   final LocalStorage _storage;
   final String? _collectionId;
 
-  ChatsNotifier(this._storage, this._collectionId) : super([]) {
+  ChatsNotifier(this._storage, this._collectionId, [List<Chat> initial = const []])
+      : super(initial) {
     refresh();
   }
 
@@ -187,11 +271,21 @@ class ChatsNotifier extends StateNotifier<List<Chat>> {
   }
 }
 
-final chatsProvider = StateNotifierProvider<ChatsNotifier, List<Chat>>((ref) {
-  final storage = ref.watch(localStorageProvider);
+final projectChatsProvider =
+    StateNotifierProvider.family<ChatsNotifier, List<Chat>, String>((
+      ref,
+      collectionId,
+    ) {
+      final storage = ref.watch(localStorageProvider);
+      return ChatsNotifier(storage, collectionId);
+    });
+
+final chatsProvider = Provider<List<Chat>>((ref) {
   final currentCol = ref.watch(currentCollectionProvider);
-  return ChatsNotifier(storage, currentCol?.id);
+  if (currentCol == null) return const [];
+  return ref.watch(projectChatsProvider(currentCol.id));
 });
+
 
 // Current Active Chat Provider
 final currentChatProvider = StateProvider<Chat?>((ref) => null);

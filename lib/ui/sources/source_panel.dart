@@ -2,8 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:markdown/markdown.dart' as md;
 import 'package:pdfrx/pdfrx.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/citation.dart';
@@ -21,6 +24,7 @@ class SourcePanel extends ConsumerStatefulWidget {
 
 class _SourcePanelState extends ConsumerState<SourcePanel> {
   bool _showPdfView = false;
+  bool _renderMarkdown = true;
   PdfViewerController? _pdfController;
 
   @override
@@ -243,6 +247,20 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
               const Spacer(),
               IconButton(
                 icon: Icon(
+                  _renderMarkdown ? Icons.code : Icons.auto_awesome_outlined,
+                  size: 16,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                tooltip: _renderMarkdown ? 'View raw text' : 'View formatted markdown',
+                visualDensity: VisualDensity.compact,
+                onPressed: () {
+                  setState(() {
+                    _renderMarkdown = !_renderMarkdown;
+                  });
+                },
+              ),
+              IconButton(
+                icon: Icon(
                   Icons.copy_outlined,
                   size: 16,
                   color: colorScheme.onSurfaceVariant,
@@ -276,14 +294,34 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: colorScheme.outlineVariant),
               ),
-              child: SingleChildScrollView(
-                child: SelectableText(
-                  widget.citation.excerpt,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurface,
-                    height: 1.6,
-                    fontSize: 13.5,
-                  ),
+              child: SelectionArea(
+                child: SingleChildScrollView(
+                  child: _renderMarkdown
+                      ? MarkdownBody(
+                          data: _cleanMarkdown(widget.citation.excerpt),
+                          selectable: false,
+                          styleSheet: _buildMarkdownStyle(context),
+                          inlineSyntaxes: [_UnderlineSyntax()],
+                          builders: {'u': _UnderlineBuilder()},
+                          onTapLink: (text, href, title) {
+                            if (href != null) {
+                              final uri = Uri.tryParse(href);
+                              if (uri != null &&
+                                  (uri.scheme == 'http' || uri.scheme == 'https')) {
+                                launchUrl(uri, mode: LaunchMode.externalApplication);
+                              }
+                            }
+                          },
+                        )
+                      : Text(
+                          widget.citation.excerpt,
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontFamily: 'Consolas',
+                            color: colorScheme.onSurface,
+                            height: 1.6,
+                            fontSize: 13,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -334,11 +372,137 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
     );
   }
 
+  MarkdownStyleSheet _buildMarkdownStyle(BuildContext context) {
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
+
+    return MarkdownStyleSheet(
+      p: textTheme.bodyMedium?.copyWith(
+        color: colorScheme.onSurface,
+        height: 1.6,
+        fontSize: 13.5,
+      ),
+      h1: textTheme.titleMedium?.copyWith(
+        color: colorScheme.onSurface,
+        fontWeight: FontWeight.bold,
+        fontSize: 16,
+        height: 1.5,
+      ),
+      h2: textTheme.titleSmall?.copyWith(
+        color: colorScheme.onSurface,
+        fontWeight: FontWeight.bold,
+        fontSize: 14.5,
+        height: 1.5,
+      ),
+      h3: textTheme.bodyLarge?.copyWith(
+        color: colorScheme.onSurface,
+        fontWeight: FontWeight.w600,
+        fontSize: 13.5,
+        height: 1.5,
+      ),
+      h4: textTheme.bodyMedium?.copyWith(
+        color: colorScheme.onSurface,
+        fontWeight: FontWeight.w600,
+        fontSize: 13,
+      ),
+      code: TextStyle(
+        backgroundColor: colorScheme.surfaceContainerHighest,
+        color: colorScheme.primary,
+        fontFamily: 'Consolas',
+        fontSize: 12.5,
+      ),
+      codeblockDecoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      codeblockPadding: const EdgeInsets.all(12),
+      blockquote: TextStyle(
+        color: colorScheme.onSurfaceVariant,
+        fontStyle: FontStyle.italic,
+        fontSize: 13,
+      ),
+      blockquoteDecoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(6),
+        border: Border(left: BorderSide(color: colorScheme.primary, width: 3)),
+      ),
+      blockquotePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      tableBorder: TableBorder.all(
+        color: colorScheme.outlineVariant,
+        width: 1,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      tableColumnWidth: const FlexColumnWidth(),
+      tableHead: textTheme.bodyMedium?.copyWith(
+        fontWeight: FontWeight.bold,
+        color: colorScheme.onSurface,
+        fontSize: 13,
+      ),
+      tableBody: textTheme.bodyMedium?.copyWith(
+        color: colorScheme.onSurface,
+        fontSize: 12.5,
+      ),
+      tableCellsPadding: const EdgeInsets.all(8),
+      listBullet: textTheme.bodyMedium?.copyWith(
+        color: colorScheme.primary,
+        fontSize: 13.5,
+      ),
+    );
+  }
+
+  String _cleanMarkdown(String raw) {
+    var text = raw;
+    text = text.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
+    text = text.replaceAllMapped(
+      RegExp(r'<(?:b|strong)>(.*?)</(?:b|strong)>', caseSensitive: false, dotAll: true),
+      (m) => '**${m[1]}**',
+    );
+    text = text.replaceAllMapped(
+      RegExp(r'<(?:i|em)>(.*?)</(?:i|em)>', caseSensitive: false, dotAll: true),
+      (m) => '*${m[1]}*',
+    );
+    text = text.replaceAllMapped(
+      RegExp(r'<(?:del|s)>(.*?)</(?:del|s)>', caseSensitive: false, dotAll: true),
+      (m) => '~~${m[1]}~~',
+    );
+    text = text.replaceAllMapped(
+      RegExp(r'<code>(.*?)</code>', caseSensitive: false, dotAll: true),
+      (m) => '`${m[1]}`',
+    );
+    return text;
+  }
+
   Widget _buildPdfViewer(String filePath) {
     return PdfViewer.file(
       filePath,
       initialPageNumber: widget.citation.page,
       controller: _pdfController,
+    );
+  }
+}
+
+class _UnderlineSyntax extends md.InlineSyntax {
+  _UnderlineSyntax() : super(r'<u\b[^>]*>(.*?)<\/u>');
+
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    final text = match[1] ?? '';
+    parser.addNode(md.Element.text('u', text));
+    return true;
+  }
+}
+
+class _UnderlineBuilder extends MarkdownElementBuilder {
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    return Text.rich(
+      TextSpan(
+        text: element.textContent,
+        style: preferredStyle?.copyWith(
+          decoration: TextDecoration.underline,
+        ),
+      ),
     );
   }
 }

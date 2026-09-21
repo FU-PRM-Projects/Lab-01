@@ -28,7 +28,7 @@ void main() {
       await storage.saveCollection(initialCollection);
     });
 
-    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.physicalSize = const Size(1280, 1000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();

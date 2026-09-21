@@ -1,3 +1,5 @@
+import 'package:lab_05/domain/reference_parser.dart';
+
 enum DocumentStatus { processing, ready, failed, needsReindex, deleting }
 
 DocumentStatus parseDocumentStatus(String? status) {
@@ -88,6 +90,7 @@ class PaperDocument {
   final int extractionVersion;
   final int chunkingVersion;
   final List<PaperChunk> chunks;
+  final List<PaperReference> references;
 
   const PaperDocument({
     this.schemaVersion = 1,
@@ -104,12 +107,14 @@ class PaperDocument {
     this.extractionVersion = 1,
     this.chunkingVersion = 1,
     this.chunks = const [],
+    this.references = const [],
   });
 
   PaperDocument copyWith({
     DocumentStatus? status,
     String? error,
     List<PaperChunk>? chunks,
+    List<PaperReference>? references,
     String? title,
     int? pageCount,
   }) {
@@ -128,6 +133,7 @@ class PaperDocument {
       extractionVersion: extractionVersion,
       chunkingVersion: chunkingVersion,
       chunks: chunks ?? this.chunks,
+      references: references ?? this.references,
     );
   }
 
@@ -147,6 +153,12 @@ class PaperDocument {
             documentFileName: docFileName,
           ),
         )
+        .toList(growable: false);
+
+    final rawReferences = (json['references'] as List<dynamic>?) ?? [];
+    final parsedReferences = rawReferences
+        .whereType<Map<String, dynamic>>()
+        .map(PaperReference.fromJson)
         .toList(growable: false);
 
     return PaperDocument(
@@ -170,6 +182,7 @@ class PaperDocument {
       extractionVersion: json['extractionVersion'] as int? ?? 1,
       chunkingVersion: json['chunkingVersion'] as int? ?? 1,
       chunks: parsedChunks,
+      references: parsedReferences,
     );
   }
 
@@ -189,6 +202,7 @@ class PaperDocument {
       'extractionVersion': extractionVersion,
       'chunkingVersion': chunkingVersion,
       'chunks': chunks.map((c) => c.toJson()).toList(),
+      'references': references.map((r) => r.toJson()).toList(),
     };
   }
 }

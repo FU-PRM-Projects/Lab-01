@@ -16,8 +16,20 @@ import 'package:lab_05/data/services/pdf_processor.dart';
 import 'package:lab_05/data/services/local_storage.dart';
 import 'package:lab_05/data/services/page_render_service.dart';
 import 'package:lab_05/data/services/vision_ocr_service.dart';
+import 'package:lab_05/data/services/instruct_document_service.dart';
+import 'package:lab_05/domain/reference_parser.dart';
 
 typedef ImportProgressCallback = void Function(String stage, double progress);
+
+class OcrProcessResult {
+  final List<PaperChunk> chunks;
+  final List<PaperReference> references;
+
+  const OcrProcessResult({
+    required this.chunks,
+    required this.references,
+  });
+}
 
 class PaperRepository {
   PaperRepository({required this.storage, required this.collectionId});
@@ -41,13 +53,72 @@ class PaperRepository {
       _index = index;
       await index.openOrCreate(storage.indexVectorsPath(collectionId));
       return index;
-    } catch (_) {
+    } catch (e) {
       _opening = null;
+      // If index is corrupt and collection has 0 papers, recover with a clean index
+      final papers = await storage.listPapers(collectionId);
+      if (papers.isEmpty) {
+        final collection = await storage.loadCollection(collectionId);
+        if (collection != null) {
+          try {
+            final vectorFile = File(storage.indexVectorsPath(collectionId));
+            if (await vectorFile.exists()) {
+              await vectorFile.delete();
+            }
+            final index = CollectionIndex(
+              dimensions: collection.embeddingProfile.dimensions,
+            );
+            _index = index;
+            await index.openOrCreate(storage.indexVectorsPath(collectionId));
+            await storage.saveIndexState(
+              collectionId,
+              IndexState(
+                status: 'clean',
+                embeddingProfileId: collection.embeddingProfile.id,
+                dimensions: collection.embeddingProfile.dimensions,
+                vectorCount: 0,
+                pending: null,
+              ),
+            );
+            return index;
+          } catch (_) {}
+        }
+      }
       rethrow;
     }
   }
 
   void close() => _index?.close();
+
+  Future<void> deletePaper(String documentId) async {
+    final papers = await storage.listPapers(collectionId);
+    final paper = papers.where((p) => p.id == documentId).firstOrNull;
+    if (paper != null && paper.chunks.isNotEmpty) {
+      try {
+        final collection = await storage.loadCollection(collectionId);
+        final index = await openIndex();
+        final vectorIds = paper.chunks.map((c) => c.vectorId).toList();
+        await index.removeVectors(vectorIds);
+        await index.save(storage.indexVectorsPath(collectionId));
+
+        if (collection != null) {
+          await storage.saveIndexState(
+            collectionId,
+            IndexState(
+              status: 'clean',
+              embeddingProfileId: collection.embeddingProfile.id,
+              dimensions: collection.embeddingProfile.dimensions,
+              vectorCount: index.length,
+              pending: null,
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('Warning: Could not remove vectors for $documentId: $e');
+      }
+    }
+    await storage.deletePaper(collectionId, documentId);
+  }
 
   Future<PaperDocument> importPaper({
     required File sourcePdfFile,
@@ -111,6 +182,7 @@ class PaperRepository {
       final ocrPages = extractResult.needsOcrPages;
       final hasText = extractResult.chunks.isNotEmpty;
       var chunksToIndex = extractResult.chunks;
+      var documentReferences = <PaperReference>[];
 
       if (ocrPages.isNotEmpty) {
         // Scanned or hybrid PDF: OCR the flagged pages before indexing.
@@ -122,13 +194,16 @@ class PaperRepository {
           'emptyPages=${extractResult.emptyPages.length}, '
           'textChunks=${extractResult.chunks.length}',
         );
-        final ocrChunks = await _ocrPages(
+        final ocrResult = await _ocrPages(
           pdfPath: targetPdfPath,
           documentId: documentId,
           pages: ocrPages,
+          totalPages: totalPages,
           textChunks: extractResult.chunks,
           onProgress: onProgress,
         );
+        final ocrChunks = ocrResult.chunks;
+        documentReferences = ocrResult.references;
 
         // A page that was OCR'd keeps only its OCR chunks, so text and OCR
         // chunks never mix on the same page (their ordinals are unrelated).
@@ -211,6 +286,7 @@ class PaperRepository {
         title: extractResult.title,
         pageCount: extractResult.pageCount,
         chunks: assignedChunks,
+        references: documentReferences,
       );
       await storage.savePaper(collectionId, paperDoc);
 
@@ -280,19 +356,21 @@ class PaperRepository {
   static const _maxConcurrentOcr = 3;
 
   /// Same pattern as `section_regex` in rust/src/api/pdf_parser.rs, so OCR
-  /// chunks get the same section names as text chunks.
+  /// chunks get the same section names as text chunks when used as a fallback.
   static final _sectionRegex = RegExp(
     r'^(?:\d+(?:\.\d+)*\s+)?(Abstract|Introduction|Background|Related\s+Work|Methodology|Method|Architecture|Implementation|Evaluation|Experiments?|Results?|Discussion|Conclusion|References)\b',
     caseSensitive: false,
   );
 
-  /// Renders and OCRs [pages], at most [_maxConcurrentOcr] at a time, then
-  /// chunks the text with the same Rust chunker used for text pages.
-  /// Returns only after every page is done; any page failure fails the import.
-  Future<List<PaperChunk>> _ocrPages({
+  /// Renders and OCRs [pages], assembles the full Markdown document across all pages,
+  /// queries an OpenRouter instruct model for section and reference parsing,
+  /// and chunks the text with accurate section labels.
+  /// Throws immediately if OCR or OpenRouter instruct parsing fails.
+  Future<OcrProcessResult> _ocrPages({
     required String pdfPath,
     required String documentId,
     required List<int> pages,
+    required int totalPages,
     required List<PaperChunk> textChunks,
     ImportProgressCallback? onProgress,
   }) async {
@@ -344,35 +422,64 @@ class PaperRepository {
       Error.throwWithStackTrace(failure!, failureStack ?? StackTrace.current);
     }
 
-    // Section tracking mirrors the Rust parser: start at "Introduction",
-    // carry the current section forward page by page, and let the first
-    // matching heading on a page set the section for that whole page.
-    final ocrPageSet = queue.toSet();
-    final sortedText = textChunks
-        .where((c) => !ocrPageSet.contains(c.page))
-        .toList()
-      ..sort((a, b) {
-        final byPage = a.page.compareTo(b.page);
-        return byPage != 0 ? byPage : a.ordinal.compareTo(b.ordinal);
-      });
-    var currentSection = 'Introduction';
-    var textIndex = 0;
+    // Assemble per-page text for all pages in the PDF.
+    // For OCR pages, use the transcribed markdown from texts[p].
+    // For native text pages, rebuild text from textChunks.
+    final allPageTexts = <int, String>{};
+    final chunksByPage = <int, List<PaperChunk>>{};
+    for (final chunk in textChunks) {
+      chunksByPage.putIfAbsent(chunk.page, () => []).add(chunk);
+    }
+
+    for (var page = 1; page <= totalPages; page++) {
+      if (texts.containsKey(page)) {
+        allPageTexts[page] = texts[page]!;
+      } else if (chunksByPage.containsKey(page)) {
+        allPageTexts[page] = ReferenceParser.rebuildText(chunksByPage[page]!);
+      }
+    }
+
+    final assembledMarkdown = InstructDocumentService.assembleMarkdown(
+      allPageTexts,
+      totalPages,
+    );
+
+    onProgress?.call(
+      'Parsing sections and references with instruct model ($modelId)...',
+      0.55,
+    );
+
+    // Call OpenRouter instruct model. DO NOT catch to fallback - fail immediately on error.
+    final instructService = InstructDocumentService(settings: settings);
+    final ParsedStructureResult structureResult;
+    try {
+      structureResult = await instructService.parseStructure(
+        assembledMarkdown,
+        modelId: modelId,
+      );
+    } finally {
+      instructService.close();
+    }
+
+    final sortedSections = structureResult.sections.toList()
+      ..sort((a, b) => a.page.compareTo(b.page));
 
     final chunks = <PaperChunk>[];
     for (final page in queue) {
-      // Pick up the section reached by text pages that come before this page.
-      while (textIndex < sortedText.length &&
-          sortedText[textIndex].page < page) {
-        currentSection = sortedText[textIndex].section;
-        textIndex++;
-      }
-
       final text = texts[page]?.trim() ?? '';
       if (text.isEmpty) {
         debugPrint('[import] $documentId: OCR page $page is blank');
         continue;
       }
 
+      // Determine active section for this page from the instruct model's detected sections
+      var currentSection = 'Introduction';
+      final matching = sortedSections.where((s) => s.page <= page).toList();
+      if (matching.isNotEmpty) {
+        currentSection = matching.last.name;
+      }
+
+      // Check if page contains regex section headings as an additional signal
       for (final line in text.split('\n')) {
         final trimmed = line.trim().replaceFirst(RegExp(r'^#+'), '').trim();
         final match = _sectionRegex.firstMatch(trimmed);
@@ -389,16 +496,25 @@ class PaperRepository {
         section: currentSection,
         startOrdinal: 0,
       );
+
+      final sectionsOnThisPage =
+          sortedSections.where((s) => s.page == page).toList();
       for (final rc in pageChunks) {
+        var chunkSection = rc.section;
+        for (final sec in sectionsOnThisPage) {
+          if ((sec.rawHeading != null && rc.text.contains(sec.rawHeading!)) ||
+              rc.text.toLowerCase().contains(sec.name.toLowerCase())) {
+            chunkSection = sec.name;
+          }
+        }
+
         chunks.add(
           PaperChunk(
-            // ':ocr' in the id (not the section) marks OCR chunks and keeps
-            // ids from clashing with text chunks on the same page.
             id: '$documentId:p${rc.page}:ocr${rc.ordinal}',
             vectorId: 0,
             page: rc.page,
             ordinal: rc.ordinal,
-            section: rc.section,
+            section: chunkSection,
             startChar: rc.startChar,
             endChar: rc.endChar,
             text: rc.text,
@@ -406,6 +522,10 @@ class PaperRepository {
         );
       }
     }
-    return chunks;
+
+    return OcrProcessResult(
+      chunks: chunks,
+      references: structureResult.references,
+    );
   }
 }
