@@ -16,9 +16,13 @@ class SettingsDialog extends ConsumerStatefulWidget {
 class _SettingsDialogState extends ConsumerState<SettingsDialog> {
   late TextEditingController _urlController;
   late TextEditingController _apiKeyController;
+  late TextEditingController _geminiKeyController;
   late String _selectedModel;
+  late String _selectedGeminiModel;
   late String _selectedTheme;
+  late String _selectedProvider;
   bool _obscureKey = true;
+  bool _obscureGeminiKey = true;
 
   static const List<Map<String, String>> _availableChatModels = [
     {
@@ -33,23 +37,35 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
     },
   ];
 
+  static const List<Map<String, String>> _availableGeminiModels = [
+    {'id': 'gemini-2.5-flash', 'name': 'Gemini 2.5 Flash'},
+    {'id': 'gemini-2.5-pro', 'name': 'Gemini 2.5 Pro'},
+  ];
+
   @override
   void initState() {
     super.initState();
     final settings = ref.read(settingsProvider);
     _apiKeyController = TextEditingController(text: settings.openRouterApiKey);
+    _geminiKeyController = TextEditingController(text: settings.geminiApiKey);
     _urlController = TextEditingController(text: settings.openRouterBaseUrl);
     _selectedTheme = settings.theme;
+    _selectedProvider = settings.provider;
     final modelIds = _availableChatModels.map((m) => m['id']!).toList();
     _selectedModel = modelIds.contains(settings.chatModel)
         ? settings.chatModel
         : modelIds.first;
+    final geminiModelIds = _availableGeminiModels.map((m) => m['id']!).toList();
+    _selectedGeminiModel = geminiModelIds.contains(settings.geminiModel)
+        ? settings.geminiModel
+        : geminiModelIds.first;
   }
 
   @override
   void dispose() {
     _urlController.dispose();
     _apiKeyController.dispose();
+    _geminiKeyController.dispose();
     super.dispose();
   }
 
@@ -164,6 +180,132 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                   _applyTheme(newSelection.first);
                 },
               ),
+
+              const SizedBox(height: 20),
+
+              // Chat Provider Selector
+              Text(
+                'Chat Provider',
+                style: textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment<String>(
+                    value: 'openrouter',
+                    label: Text('OpenRouter'),
+                    icon: Icon(Icons.hub_outlined, size: 16),
+                  ),
+                  ButtonSegment<String>(
+                    value: 'gemini',
+                    label: Text('Gemini (direct)'),
+                    icon: Icon(Icons.auto_awesome_outlined, size: 16),
+                  ),
+                ],
+                selected: {_selectedProvider},
+                onSelectionChanged: (Set<String> newSelection) {
+                  setState(() {
+                    _selectedProvider = newSelection.first;
+                  });
+                },
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Embeddings/search always use OpenRouter; this only picks '
+                'which model answers chat turns.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 11,
+                ),
+              ),
+
+              if (_selectedProvider == 'gemini') ...[
+                const SizedBox(height: 18),
+                Text(
+                  'Gemini API Key',
+                  style: textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _geminiKeyController,
+                  obscureText: _obscureGeminiKey,
+                  decoration: InputDecoration(
+                    hintText: 'AIza...',
+                    helperText:
+                        'From Google AI Studio. Saved locally in settings.json.',
+                    helperStyle: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureGeminiKey
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        size: 18,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureGeminiKey = !_obscureGeminiKey;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Gemini Model',
+                  style: textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: colorScheme.outlineVariant),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedGeminiModel,
+                      isExpanded: true,
+                      dropdownColor: colorScheme.surfaceContainerHigh,
+                      items: _availableGeminiModels.map((model) {
+                        return DropdownMenuItem<String>(
+                          value: model['id']!,
+                          child: Text(
+                            model['name']!,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _selectedGeminiModel = val;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 20),
 
@@ -411,9 +553,12 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
 
                       final newSettings = settings.copyWith(
                         theme: _selectedTheme,
+                        provider: _selectedProvider,
                         openRouterBaseUrl: url,
                         openRouterApiKey: key,
                         chatModel: _selectedModel,
+                        geminiApiKey: _geminiKeyController.text.trim(),
+                        geminiModel: _selectedGeminiModel,
                       );
                       try {
                         await ref
