@@ -69,6 +69,24 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
     super.dispose();
   }
 
+  Future<void> _applyTheme(String theme) async {
+    final previousTheme = ref.read(settingsProvider).theme;
+    setState(() => _selectedTheme = theme);
+
+    try {
+      final currentSettings = ref.read(settingsProvider);
+      await ref
+          .read(settingsProvider.notifier)
+          .update(currentSettings.copyWith(theme: theme));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _selectedTheme = previousTheme);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not change appearance: $error')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = context.colorScheme;
@@ -159,9 +177,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                 ],
                 selected: {_selectedTheme},
                 onSelectionChanged: (Set<String> newSelection) {
-                  setState(() {
-                    _selectedTheme = newSelection.first;
-                  });
+                  _applyTheme(newSelection.first);
                 },
               ),
 
@@ -310,7 +326,10 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                           AppSettings.defaultOpenRouterBaseUrl;
                     },
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       visualDensity: VisualDensity.compact,
                     ),
                     child: const Text('Reset default'),
@@ -378,7 +397,10 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
               ),
               const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceContainerLowest,
                   borderRadius: BorderRadius.circular(12),
@@ -386,7 +408,10 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
-                    value: _availableChatModels.any((m) => m['id'] == _selectedModel)
+                    value:
+                        _availableChatModels.any(
+                          (m) => m['id'] == _selectedModel,
+                        )
                         ? _selectedModel
                         : _availableChatModels.first['id']!,
                     isExpanded: true,

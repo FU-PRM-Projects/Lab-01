@@ -95,6 +95,7 @@ void main() {
           theme: 'dark',
           openRouterBaseUrl: 'https://custom.openrouter.proxy/v1',
           openRouterApiKey: 'sk-or-test-456',
+          pinnedCollectionIds: ['col_1', 'col_2'],
         );
         await storage.saveSettings(settings);
 
@@ -105,6 +106,7 @@ void main() {
           equals('https://custom.openrouter.proxy/v1'),
         );
         expect(loaded.openRouterApiKey, equals('sk-or-test-456'));
+        expect(loaded.pinnedCollectionIds, equals(['col_1', 'col_2']));
         expect(
           loaded.chatCompletionsUrl,
           equals('https://custom.openrouter.proxy/v1/chat/completions'),

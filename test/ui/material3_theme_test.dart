@@ -11,7 +11,9 @@ import 'package:lab_05/data/services/local_storage.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
 void main() {
-  testWidgets('Material 3 Dynamic Theme Switching Test', (WidgetTester tester) async {
+  testWidgets('Material 3 Dynamic Theme Switching Test', (
+    WidgetTester tester,
+  ) async {
     final tempDir = Directory.systemTemp.createTempSync('paperchat_m3_test');
     addTearDown(() {
       try {
@@ -61,7 +63,7 @@ void main() {
 
     // Verify Dark Theme is active initially
     final scaffoldDark = tester.firstWidget<Scaffold>(find.byType(Scaffold));
-    expect(scaffoldDark.backgroundColor, equals(const Color(0xFF131316)));
+    expect(scaffoldDark.backgroundColor, equals(const Color(0xFF171717)));
 
     // Verify M3 Navigation elements
     expect(find.text('PaperChat'), findsOneWidget);
@@ -70,15 +72,15 @@ void main() {
 
     // Switch theme to Light Mode
     await tester.runAsync(() async {
-      await capturedRef.read(settingsProvider.notifier).update(
-        const AppSettings(theme: 'light'),
-      );
+      await capturedRef
+          .read(settingsProvider.notifier)
+          .update(const AppSettings(theme: 'light'));
     });
     await tester.pumpAndSettle();
 
     // Verify Light Theme is active
     final scaffoldLight = tester.firstWidget<Scaffold>(find.byType(Scaffold));
-    expect(scaffoldLight.backgroundColor, equals(const Color(0xFFF8FAFC)));
+    expect(scaffoldLight.backgroundColor, equals(const Color(0xFFFFFFFF)));
 
     // Verify M3 Theme builders output valid ThemeData with useMaterial3 true
     final darkTheme = buildDarkTheme();

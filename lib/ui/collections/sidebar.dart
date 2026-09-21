@@ -24,14 +24,43 @@ class AppSidebar extends ConsumerStatefulWidget {
 
 class _AppSidebarState extends ConsumerState<AppSidebar> {
   final Set<String> _expandedCollections = {};
+  String? _hoveredCollectionId;
+  String? _hoveredChatId;
+  String? _hoveredPinnedCollectionId;
+  bool _isFooterHovered = false;
 
   void _toggleTheme() {
     final settings = ref.read(settingsProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final nextTheme = isDark ? 'light' : 'dark';
-    ref.read(settingsProvider.notifier).update(
-      settings.copyWith(theme: nextTheme),
-    );
+    ref
+        .read(settingsProvider.notifier)
+        .update(settings.copyWith(theme: nextTheme));
+  }
+
+  Future<void> _selectCollection(Collection collection) async {
+    await ref.read(chatControllerProvider.notifier).stop();
+    if (!mounted) return;
+    ref.read(activeCitationProvider.notifier).state = null;
+    ref.read(currentCollectionProvider.notifier).state = collection;
+    ref.read(currentChatProvider.notifier).state = null;
+  }
+
+  Future<void> _togglePinnedCollection(String collectionId) async {
+    final settings = ref.read(settingsProvider);
+    final pinnedIds = settings.pinnedCollectionIds.toSet();
+    if (!pinnedIds.add(collectionId)) pinnedIds.remove(collectionId);
+
+    try {
+      await ref
+          .read(settingsProvider.notifier)
+          .update(settings.copyWith(pinnedCollectionIds: pinnedIds.toList()));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update pinned projects: $error')),
+      );
+    }
   }
 
   @override
@@ -45,55 +74,60 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
     final chats = ref.watch(chatsProvider);
     final currentChat = ref.watch(currentChatProvider);
     final apiKey = ref.watch(apiKeyProvider);
+    final settings = ref.watch(settingsProvider);
+    final pinnedIds = settings.pinnedCollectionIds.toSet();
+    final pinnedCollections = collections
+        .where((collection) => pinnedIds.contains(collection.id))
+        .toList(growable: false);
+    final projectCollections = collections
+        .where((collection) => !pinnedIds.contains(collection.id))
+        .toList(growable: false);
 
     return AbsorbPointer(
       absorbing: ref.watch(importControllerProvider) != null,
       child: Container(
-        width: 270,
+        width: 278,
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerLow,
           border: Border(
-            right: BorderSide(
-              color: colorScheme.outlineVariant,
-              width: 1,
-            ),
+            right: BorderSide(color: colorScheme.outlineVariant, width: 1),
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header: Branding & Action Icons
+            // Codex-style workspace header
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
+              padding: const EdgeInsets.fromLTRB(14, 16, 8, 12),
               child: Row(
                 children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.psychology,
-                      size: 20,
-                      color: colorScheme.onPrimaryContainer,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Text(
+                          'PaperChat',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.titleMedium?.copyWith(
+                            color: colorScheme.onSurface,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.25,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 19,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'PaperChat',
-                    style: textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  const Spacer(),
                   IconButton(
                     icon: Icon(
                       Icons.settings_outlined,
-                      size: 18,
+                      size: 19,
                       color: colorScheme.onSurfaceVariant,
                     ),
                     tooltip: 'Settings',
@@ -108,19 +142,28 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
               ),
             ),
 
-            // Material 3 "New Chat" Pill Button
+            // Primary workspace action
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              child: FilledButton.tonalIcon(
+              child: TextButton.icon(
                 onPressed: widget.onNewChat,
-                icon: const Icon(Icons.edit_note, size: 20),
+                icon: const Icon(Icons.edit_square, size: 19),
                 label: const Text('New chat'),
-                style: FilledButton.styleFrom(
-                  shape: const StadiumBorder(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  backgroundColor: colorScheme.primaryContainer,
-                  foregroundColor: colorScheme.onPrimaryContainer,
+                style: TextButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 11,
+                  ),
+                  foregroundColor: colorScheme.onSurface,
                   alignment: Alignment.centerLeft,
+                  textStyle: const TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  overlayColor: colorScheme.onSurface.withValues(alpha: 0.06),
                 ),
               ),
             ),
@@ -132,24 +175,142 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 children: [
-                  // Projects / Collections Section Header
                   Padding(
                     padding: const EdgeInsets.fromLTRB(8, 8, 4, 4),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Pinned',
+                          style: textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.25,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 17,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (pinnedCollections.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 5, 8, 8),
+                      child: Text(
+                        'Pin projects from the ••• menu',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.62,
+                          ),
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    )
+                  else
+                    ...pinnedCollections.map((collection) {
+                      final isSelected = currentCol?.id == collection.id;
+                      final isHovered =
+                          _hoveredPinnedCollectionId == collection.id;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        curve: Curves.easeOutCubic,
+                        margin: const EdgeInsets.symmetric(vertical: 1),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? colorScheme.secondaryContainer
+                              : isHovered
+                              ? colorScheme.onSurface.withValues(
+                                  alpha: isDark ? 0.065 : 0.035,
+                                )
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(7),
+                          hoverColor: Colors.transparent,
+                          splashColor: Colors.transparent,
+                          highlightColor: Colors.transparent,
+                          onHover: (hovering) {
+                            setState(() {
+                              _hoveredPinnedCollectionId = hovering
+                                  ? collection.id
+                                  : null;
+                            });
+                          },
+                          onTap: () => _selectCollection(collection),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.folder_outlined,
+                                  size: 18,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 9),
+                                Expanded(
+                                  child: Text(
+                                    collection.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      fontSize: 14,
+                                      color: colorScheme.onSurface,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w500
+                                          : FontWeight.w400,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: () =>
+                                      _togglePinnedCollection(collection.id),
+                                  icon: const Icon(
+                                    Icons.push_pin_outlined,
+                                    size: 16,
+                                  ),
+                                  tooltip: 'Unpin project',
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 32,
+                                    height: 32,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  const SizedBox(height: 8),
+
+                  // Projects / Collections Section Header
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 10, 4, 6),
                     child: Row(
                       children: [
                         Text(
                           'Projects',
                           style: textTheme.labelSmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.8,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.25,
                           ),
                         ),
                         const Spacer(),
                         IconButton(
                           icon: Icon(
                             Icons.add,
-                            size: 18,
+                            size: 19,
                             color: colorScheme.onSurfaceVariant,
                           ),
                           visualDensity: VisualDensity.compact,
@@ -161,21 +322,26 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                   ),
 
                   // Collection items
-                  if (collections.isEmpty)
+                  if (projectCollections.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 8,
                       ),
                       child: Text(
-                        'No collections yet',
+                        collections.isEmpty
+                            ? 'No projects yet'
+                            : 'All projects are pinned',
                         style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                          fontSize: 13,
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
                       ),
                     )
                   else
-                    ...collections.map((col) {
+                    ...projectCollections.map((col) {
                       final isSelected = currentCol?.id == col.id;
                       final isExpanded =
                           _expandedCollections.contains(col.id) || isSelected;
@@ -183,33 +349,37 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Container(
-                            margin: const EdgeInsets.symmetric(vertical: 2),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 120),
+                            curve: Curves.easeOutCubic,
+                            margin: const EdgeInsets.symmetric(vertical: 1),
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? colorScheme.secondaryContainer
+                                  : _hoveredCollectionId == col.id
+                                  ? colorScheme.onSurface.withValues(
+                                      alpha: isDark ? 0.065 : 0.035,
+                                    )
                                   : Colors.transparent,
-                              borderRadius: BorderRadius.circular(24),
+                              borderRadius: BorderRadius.circular(
+                                isSelected ? 9 : 7,
+                              ),
                             ),
                             child: InkWell(
-                              borderRadius: BorderRadius.circular(24),
+                              borderRadius: BorderRadius.circular(10),
+                              hoverColor: Colors.transparent,
+                              splashColor: Colors.transparent,
+                              highlightColor: Colors.transparent,
+                              onHover: (hovering) {
+                                setState(() {
+                                  _hoveredCollectionId = hovering
+                                      ? col.id
+                                      : null;
+                                });
+                              },
                               onTap: () async {
-                                await ref
-                                    .read(chatControllerProvider.notifier)
-                                    .stop();
+                                await _selectCollection(col);
                                 if (!mounted) return;
-                                ref
-                                        .read(activeCitationProvider.notifier)
-                                        .state =
-                                    null;
-                                ref
-                                        .read(
-                                          currentCollectionProvider.notifier,
-                                        )
-                                        .state =
-                                    col;
-                                ref.read(currentChatProvider.notifier).state =
-                                    null;
                                 setState(() {
                                   if (_expandedCollections.contains(col.id)) {
                                     _expandedCollections.remove(col.id);
@@ -220,8 +390,8 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                               },
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
+                                  horizontal: 10,
+                                  vertical: 2,
                                 ),
                                 child: Row(
                                   children: [
@@ -234,104 +404,166 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                                           ? colorScheme.onSecondaryContainer
                                           : colorScheme.onSurfaceVariant,
                                     ),
-                                    const SizedBox(width: 10),
+                                    const SizedBox(width: 9),
                                     Expanded(
                                       child: Text(
                                         col.name,
                                         style: textTheme.bodyMedium?.copyWith(
+                                          fontSize: 14,
                                           color: isSelected
                                               ? colorScheme.onSecondaryContainer
                                               : colorScheme.onSurface,
                                           fontWeight: isSelected
-                                              ? FontWeight.w600
-                                              : FontWeight.normal,
+                                              ? FontWeight.w500
+                                              : FontWeight.w400,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    PopupMenuButton<String>(
-                                      icon: Icon(
-                                        Icons.more_vert,
-                                        size: 16,
-                                        color: isSelected
-                                            ? colorScheme.onSecondaryContainer
-                                            : colorScheme.onSurfaceVariant,
-                                      ),
-                                      tooltip: 'Collection options',
-                                      color: colorScheme.surfaceContainerHigh,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        side: BorderSide(
-                                          color: colorScheme.outlineVariant,
+                                    SizedBox(
+                                      width: 32,
+                                      height: 32,
+                                      child: PopupMenuButton<String>(
+                                        padding: EdgeInsets.zero,
+                                        splashRadius: 17,
+                                        position: PopupMenuPosition.under,
+                                        offset: const Offset(0, 2),
+                                        icon: Icon(
+                                          Icons.more_vert,
+                                          size: 17,
+                                          color: isSelected
+                                              ? colorScheme.onSecondaryContainer
+                                              : colorScheme.onSurfaceVariant,
                                         ),
-                                      ),
-                                      onSelected: (action) async {
-                                        if (action == 'import') {
-                                          await ref
-                                              .read(chatControllerProvider.notifier)
-                                              .stop();
-                                          if (!mounted) return;
-                                          ref.read(currentChatProvider.notifier).state = null;
-                                          ref.read(activeCitationProvider.notifier).state = null;
-                                          ref
-                                                  .read(
-                                                    currentCollectionProvider
-                                                        .notifier,
-                                                  )
-                                                  .state =
-                                              col;
-                                          widget.onImportPaper();
-                                        } else if (action == 'rename') {
-                                          _promptRenameCollection(context, col);
-                                        } else if (action == 'delete') {
-                                          _confirmDeleteCollection(
-                                            context,
-                                            col,
-                                          );
-                                        }
-                                      },
-                                      itemBuilder: (_) => [
-                                        const PopupMenuItem(
-                                          value: 'import',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.upload_file, size: 16),
-                                              SizedBox(width: 8),
-                                              Text('Import PDF Paper'),
-                                            ],
+                                        tooltip: 'Collection options',
+                                        color: colorScheme.surfaceContainerHigh,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          side: BorderSide(
+                                            color: colorScheme.outlineVariant,
                                           ),
                                         ),
-                                        const PopupMenuItem(
-                                          value: 'rename',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.edit_outlined, size: 16),
-                                              SizedBox(width: 8),
-                                              Text('Rename'),
-                                            ],
+                                        onSelected: (action) async {
+                                          if (action == 'pin') {
+                                            await _togglePinnedCollection(
+                                              col.id,
+                                            );
+                                          } else if (action == 'import') {
+                                            await ref
+                                                .read(
+                                                  chatControllerProvider
+                                                      .notifier,
+                                                )
+                                                .stop();
+                                            if (!mounted) return;
+                                            ref
+                                                    .read(
+                                                      currentChatProvider
+                                                          .notifier,
+                                                    )
+                                                    .state =
+                                                null;
+                                            ref
+                                                    .read(
+                                                      activeCitationProvider
+                                                          .notifier,
+                                                    )
+                                                    .state =
+                                                null;
+                                            ref
+                                                    .read(
+                                                      currentCollectionProvider
+                                                          .notifier,
+                                                    )
+                                                    .state =
+                                                col;
+                                            widget.onImportPaper();
+                                          } else if (action == 'rename') {
+                                            _promptRenameCollection(
+                                              context,
+                                              col,
+                                            );
+                                          } else if (action == 'delete') {
+                                            _confirmDeleteCollection(
+                                              context,
+                                              col,
+                                            );
+                                          }
+                                        },
+                                        itemBuilder: (_) => [
+                                          PopupMenuItem(
+                                            value: 'pin',
+                                            height: 40,
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  pinnedIds.contains(col.id)
+                                                      ? Icons.push_pin
+                                                      : Icons.push_pin_outlined,
+                                                  size: 16,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  pinnedIds.contains(col.id)
+                                                      ? 'Unpin Project'
+                                                      : 'Pin Project',
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                        PopupMenuItem(
-                                          value: 'delete',
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.delete_outline,
-                                                size: 16,
-                                                color: colorScheme.error,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                'Delete Collection',
-                                                style: TextStyle(
+                                          const PopupMenuItem(
+                                            value: 'import',
+                                            height: 40,
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.upload_file,
+                                                  size: 16,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text('Import PDF Paper'),
+                                              ],
+                                            ),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'rename',
+                                            height: 40,
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.edit_outlined,
+                                                  size: 16,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text('Rename'),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'delete',
+                                            height: 40,
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.delete_outline,
+                                                  size: 16,
                                                   color: colorScheme.error,
                                                 ),
-                                              ),
-                                            ],
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'Delete Collection',
+                                                  style: TextStyle(
+                                                    color: colorScheme.error,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -345,13 +577,14 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                                 if (papers.isEmpty) {
                                   return Padding(
                                     padding: const EdgeInsets.only(
-                                      left: 36,
-                                      top: 4,
-                                      bottom: 6,
+                                      left: 34,
+                                      top: 2,
+                                      bottom: 4,
                                     ),
                                     child: Text(
                                       'No papers yet',
                                       style: textTheme.labelSmall?.copyWith(
+                                        fontSize: 12.5,
                                         color: colorScheme.onSurfaceVariant
                                             .withValues(alpha: 0.7),
                                       ),
@@ -372,13 +605,15 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                                           Icon(
                                             paper.status.name == 'ready'
                                                 ? Icons.description_outlined
-                                                : paper.status.name == 'processing'
+                                                : paper.status.name ==
+                                                      'processing'
                                                 ? Icons.sync
                                                 : Icons.error_outline,
-                                            size: 14,
+                                            size: 16,
                                             color: paper.status.name == 'ready'
                                                 ? colorScheme.onSurfaceVariant
-                                                : paper.status.name == 'processing'
+                                                : paper.status.name ==
+                                                      'processing'
                                                 ? colorScheme.primary
                                                 : colorScheme.error,
                                           ),
@@ -386,10 +621,12 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                                           Expanded(
                                             child: Text(
                                               paper.title,
-                                              style: textTheme.bodySmall?.copyWith(
-                                                color: colorScheme.onSurfaceVariant,
-                                                fontSize: 12,
-                                              ),
+                                              style: textTheme.bodySmall
+                                                  ?.copyWith(
+                                                    color: colorScheme
+                                                        .onSurfaceVariant,
+                                                    fontSize: 13,
+                                                  ),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             ),
@@ -412,11 +649,12 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(8, 8, 4, 4),
                     child: Text(
-                      'RECENTS',
+                      'Recents',
                       style: textTheme.labelSmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.25,
                       ),
                     ),
                   ),
@@ -430,7 +668,10 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                       child: Text(
                         'No recent chats',
                         style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                          fontSize: 13,
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
                       ),
                     )
@@ -438,16 +679,30 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                     ...chats.map((chat) {
                       final isSelected = currentChat?.id == chat.id;
 
-                      return Container(
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        curve: Curves.easeOutCubic,
                         margin: const EdgeInsets.symmetric(vertical: 1.5),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? colorScheme.secondaryContainer
+                              : _hoveredChatId == chat.id
+                              ? colorScheme.onSurface.withValues(
+                                  alpha: isDark ? 0.065 : 0.035,
+                                )
                               : Colors.transparent,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(8),
+                          hoverColor: Colors.transparent,
+                          splashColor: Colors.transparent,
+                          highlightColor: Colors.transparent,
+                          onHover: (hovering) {
+                            setState(() {
+                              _hoveredChatId = hovering ? chat.id : null;
+                            });
+                          },
                           onTap: () async {
                             await ref
                                 .read(chatControllerProvider.notifier)
@@ -459,29 +714,30 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                           },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
+                              horizontal: 10,
+                              vertical: 6,
                             ),
                             child: Row(
                               children: [
                                 Icon(
                                   Icons.chat_bubble_outline,
-                                  size: 15,
+                                  size: 17,
                                   color: isSelected
                                       ? colorScheme.onSecondaryContainer
                                       : colorScheme.onSurfaceVariant,
                                 ),
-                                const SizedBox(width: 10),
+                                const SizedBox(width: 9),
                                 Expanded(
                                   child: Text(
                                     chat.title,
                                     style: textTheme.bodySmall?.copyWith(
+                                      fontSize: 14,
                                       color: isSelected
                                           ? colorScheme.onSecondaryContainer
                                           : colorScheme.onSurface,
                                       fontWeight: isSelected
-                                          ? FontWeight.w600
-                                          : FontWeight.normal,
+                                          ? FontWeight.w500
+                                          : FontWeight.w400,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -491,7 +747,7 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                                   IconButton(
                                     icon: Icon(
                                       Icons.delete_outline,
-                                      size: 16,
+                                      size: 18,
                                       color: colorScheme.onSecondaryContainer,
                                     ),
                                     visualDensity: VisualDensity.compact,
@@ -525,96 +781,113 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
               ),
             ),
 
-            // Material 3 Tonal Footer
-            Container(
-              margin: const EdgeInsets.all(12),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: colorScheme.outlineVariant),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 15,
-                    backgroundColor: colorScheme.primaryContainer,
-                    child: Text(
-                      'P',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onPrimaryContainer,
+            // Local account and settings footer
+            MouseRegion(
+              onEnter: (_) => setState(() => _isFooterHovered = true),
+              onExit: (_) => setState(() => _isFooterHovered = false),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                curve: Curves.easeOutCubic,
+                margin: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: _isFooterHovered
+                      ? colorScheme.surfaceContainer
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 15,
+                      backgroundColor: colorScheme.primaryContainer,
+                      child: Text(
+                        'P',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: InkWell(
-                      onTap: () {
-                        showDialog<void>(
-                          context: context,
-                          builder: (_) => const SettingsDialog(),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Local Workspace',
-                            style: textTheme.labelMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: apiKey.isNotEmpty
-                                      ? AppColors.success
-                                      : AppColors.warning,
-                                  shape: BoxShape.circle,
-                                ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          showDialog<void>(
+                            context: context,
+                            builder: (_) => const SettingsDialog(),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Local Workspace',
+                              style: textTheme.labelMedium?.copyWith(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w500,
+                                color: colorScheme.onSurface,
                               ),
-                              const SizedBox(width: 5),
-                              Flexible(
-                                child: Text(
-                                  apiKey.isNotEmpty
-                                      ? 'OpenRouter Ready'
-                                      : 'Key Required',
-                                  style: textTheme.labelSmall?.copyWith(
-                                    fontSize: 10.5,
+                            ),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
                                     color: apiKey.isNotEmpty
                                         ? AppColors.success
                                         : AppColors.warning,
-                                    fontWeight: FontWeight.w500,
+                                    shape: BoxShape.circle,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
+                                const SizedBox(width: 5),
+                                Flexible(
+                                  child: Text(
+                                    apiKey.isNotEmpty
+                                        ? 'OpenRouter Ready'
+                                        : 'Key Required',
+                                    style: textTheme.labelSmall?.copyWith(
+                                      fontSize: 11.5,
+                                      color: apiKey.isNotEmpty
+                                          ? AppColors.success
+                                          : AppColors.warning,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                      size: 17,
-                      color: colorScheme.onSurfaceVariant,
+                    IconButton(
+                      icon: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 140),
+                        child: Icon(
+                          isDark
+                              ? Icons.light_mode_outlined
+                              : Icons.dark_mode_outlined,
+                          key: ValueKey(isDark),
+                          size: 19,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      tooltip: isDark ? 'Light mode' : 'Dark mode',
+                      onPressed: _toggleTheme,
                     ),
-                    visualDensity: VisualDensity.compact,
-                    tooltip: isDark ? 'Light mode' : 'Dark mode',
-                    onPressed: _toggleTheme,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],

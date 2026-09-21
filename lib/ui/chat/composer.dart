@@ -21,7 +21,18 @@ class _CodexComposerState extends ConsumerState<CodexComposer> {
   final FocusNode _keyboardFocusNode = FocusNode();
 
   @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_handleFocusChanged);
+  }
+
+  void _handleFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    _focusNode.removeListener(_handleFocusChanged);
     _controller.dispose();
     _focusNode.dispose();
     _keyboardFocusNode.dispose();
@@ -64,18 +75,30 @@ class _CodexComposerState extends ConsumerState<CodexComposer> {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 820),
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.fromLTRB(18, 6, 18, 14),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: colorScheme.outlineVariant),
+            color: isDark
+                ? colorScheme.surfaceContainerHigh
+                : colorScheme.surfaceBright,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: _focusNode.hasFocus
+                  ? colorScheme.outline
+                  : colorScheme.outlineVariant,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.08),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
+                color: Colors.black.withValues(
+                  alpha: _focusNode.hasFocus
+                      ? (isDark ? 0.30 : 0.10)
+                      : (isDark ? 0.20 : 0.05),
+                ),
+                blurRadius: _focusNode.hasFocus ? 18 : 12,
+                offset: Offset(0, _focusNode.hasFocus ? 5 : 3),
               ),
             ],
           ),
@@ -83,38 +106,9 @@ class _CodexComposerState extends ConsumerState<CodexComposer> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Top breadcrumb tags inside composer card
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Row(
-                  children: [
-                    _buildComposerTag(
-                      context,
-                      Icons.folder_outlined,
-                      collection?.name ?? 'No Collection',
-                    ),
-                    const SizedBox(width: 8),
-                    _buildComposerTag(
-                      context,
-                      Icons.storage_outlined,
-                      'Local TurboVEC',
-                    ),
-                    const SizedBox(width: 8),
-                    _buildComposerTag(
-                      context,
-                      Icons.check_circle_outline,
-                      'Ready',
-                    ),
-                  ],
-                ),
-              ),
-
               // Multi-line Text Input
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
                 child: KeyboardListener(
                   focusNode: _keyboardFocusNode,
                   onKeyEvent: (event) {
@@ -128,7 +122,7 @@ class _CodexComposerState extends ConsumerState<CodexComposer> {
                     controller: _controller,
                     focusNode: _focusNode,
                     minLines: 1,
-                    maxLines: 6,
+                    maxLines: 4,
                     style: textTheme.bodyLarge?.copyWith(
                       color: colorScheme.onSurface,
                       height: 1.45,
@@ -137,15 +131,17 @@ class _CodexComposerState extends ConsumerState<CodexComposer> {
                     decoration: InputDecoration(
                       hintText: collection == null
                           ? 'Select or create a collection to begin research...'
-                          : 'Ask anything about papers in ${collection.name}...',
+                          : 'Message PaperChat about ${collection.name}...',
                       hintStyle: textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.65),
+                        color: colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.65,
+                        ),
                       ),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
                       filled: false,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 6),
                     ),
                   ),
                 ),
@@ -153,30 +149,41 @@ class _CodexComposerState extends ConsumerState<CodexComposer> {
 
               // Bottom Action Bar
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                padding: const EdgeInsets.fromLTRB(8, 2, 10, 8),
                 child: Row(
                   children: [
-                    // "+ Import PDF" Action Button
-                    FilledButton.tonalIcon(
-                      onPressed: collection == null ? null : widget.onImportPaper,
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('Import PDF'),
-                      style: FilledButton.styleFrom(
+                    // Attach a source to the active workspace
+                    TextButton.icon(
+                      onPressed: collection == null
+                          ? null
+                          : widget.onImportPaper,
+                      icon: const Icon(Icons.attach_file_rounded, size: 16),
+                      label: const Text('Add PDF'),
+                      style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
+                          horizontal: 8,
+                          vertical: 5,
                         ),
-                        backgroundColor: colorScheme.surfaceContainer,
                         foregroundColor: colorScheme.onSurfaceVariant,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: colorScheme.outlineVariant),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         visualDensity: VisualDensity.compact,
                       ),
                     ),
 
                     const Spacer(),
+
+                    Text(
+                      'Enter to send',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.72,
+                        ),
+                        fontSize: 10.5,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
 
                     // Model Selector Chip
                     PopupMenuButton<String>(
@@ -202,7 +209,8 @@ class _CodexComposerState extends ConsumerState<CodexComposer> {
                                     ? Icons.check
                                     : Icons.circle_outlined,
                                 size: 16,
-                                color: settings.chatModel ==
+                                color:
+                                    settings.chatModel ==
                                         'deepseek/deepseek-v4.1-flash'
                                     ? colorScheme.primary
                                     : colorScheme.onSurfaceVariant,
@@ -240,7 +248,8 @@ class _CodexComposerState extends ConsumerState<CodexComposer> {
                                     ? Icons.check
                                     : Icons.circle_outlined,
                                 size: 16,
-                                color: settings.chatModel == 'minimax/minimax-m3'
+                                color:
+                                    settings.chatModel == 'minimax/minimax-m3'
                                     ? colorScheme.primary
                                     : colorScheme.onSurfaceVariant,
                               ),
@@ -276,7 +285,7 @@ class _CodexComposerState extends ConsumerState<CodexComposer> {
                         ),
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainer,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: colorScheme.outlineVariant),
                         ),
                         child: Row(
@@ -306,9 +315,9 @@ class _CodexComposerState extends ConsumerState<CodexComposer> {
                       ),
                     ),
 
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
 
-                    // Material 3 Circular Send or Stop Button
+                    // Send or stop generation
                     IconButton.filled(
                       onPressed: () {
                         if (isStreaming) {
@@ -324,8 +333,10 @@ class _CodexComposerState extends ConsumerState<CodexComposer> {
                         foregroundColor: isStreaming
                             ? colorScheme.onError
                             : colorScheme.onPrimary,
-                        minimumSize: const Size(38, 38),
-                        shape: const CircleBorder(),
+                        minimumSize: const Size(36, 36),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(9),
+                        ),
                       ),
                       icon: Icon(
                         isStreaming ? Icons.stop : Icons.arrow_upward,
@@ -339,35 +350,6 @@ class _CodexComposerState extends ConsumerState<CodexComposer> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildComposerTag(BuildContext context, IconData icon, String text) {
-    final colorScheme = context.colorScheme;
-    final textTheme = context.textTheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: colorScheme.onSurfaceVariant),
-          const SizedBox(width: 5),
-          Text(
-            text,
-            style: textTheme.labelSmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-              fontSize: 11,
-            ),
-          ),
-        ],
       ),
     );
   }

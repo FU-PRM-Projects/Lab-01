@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lab_05/app/app.dart';
@@ -58,7 +58,7 @@ void main() {
       find.byWidgetPredicate(
         (w) =>
             w is RichText &&
-            w.text.toPlainText().contains('What should we build in lab_05?'),
+            w.text.toPlainText().contains('What should we explore in lab_05?'),
       ),
       findsOneWidget,
     );
@@ -75,6 +75,12 @@ void main() {
     expect(find.text('OpenRouter Base URL'), findsOneWidget);
     expect(find.text('OpenRouter API Key'), findsOneWidget);
     expect(find.text('Save Settings'), findsOneWidget);
+
+    // Appearance changes apply immediately from the segmented control.
+    await tester.tap(find.text('Light'));
+    await tester.pumpAndSettle();
+    final scaffoldLight = tester.firstWidget<Scaffold>(find.byType(Scaffold));
+    expect(scaffoldLight.backgroundColor, equals(const Color(0xFFFFFFFF)));
 
     // Tap Cancel to close dialog
     await tester.tap(find.text('Cancel'));

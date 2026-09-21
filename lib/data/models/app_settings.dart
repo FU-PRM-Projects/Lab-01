@@ -14,6 +14,7 @@ class AppSettings {
   final String openRouterApiKey;
   final String geminiApiKey;
   final String geminiModel;
+  final List<String> pinnedCollectionIds;
 
   static const String defaultOpenRouterBaseUrl = 'https://openrouter.ai/api/v1';
   static const String defaultChatModel = 'deepseek/deepseek-v4.1-flash';
@@ -31,6 +32,7 @@ class AppSettings {
     this.openRouterApiKey = '',
     this.geminiApiKey = '',
     this.geminiModel = defaultGeminiModel,
+    this.pinnedCollectionIds = const [],
   });
 
   String get apiBaseUrl {
@@ -54,6 +56,7 @@ class AppSettings {
     String? openRouterApiKey,
     String? geminiApiKey,
     String? geminiModel,
+    List<String>? pinnedCollectionIds,
   }) {
     return AppSettings(
       schemaVersion: schemaVersion,
@@ -68,6 +71,7 @@ class AppSettings {
       openRouterApiKey: openRouterApiKey ?? this.openRouterApiKey,
       geminiApiKey: geminiApiKey ?? this.geminiApiKey,
       geminiModel: geminiModel ?? this.geminiModel,
+      pinnedCollectionIds: pinnedCollectionIds ?? this.pinnedCollectionIds,
     );
   }
 
@@ -94,6 +98,11 @@ class AppSettings {
           '',
       geminiApiKey: (json['geminiApiKey'] as String?)?.trim() ?? '',
       geminiModel: json['geminiModel'] as String? ?? defaultGeminiModel,
+      pinnedCollectionIds:
+          (json['pinnedCollectionIds'] as List<dynamic>?)
+              ?.whereType<String>()
+              .toList(growable: false) ??
+          const [],
     );
   }
 
@@ -109,6 +118,7 @@ class AppSettings {
       'openRouterApiKey': openRouterApiKey,
       'geminiApiKey': geminiApiKey,
       'geminiModel': geminiModel,
+      'pinnedCollectionIds': pinnedCollectionIds,
     };
   }
 }
