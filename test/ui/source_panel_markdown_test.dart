@@ -34,53 +34,60 @@ els with this continual learning capacity. These approaches generally fall into 
     excerpt: sampleExcerpt,
   );
 
-  testWidgets('SourcePanel renders excerpt in markdown by default and can toggle to raw text', (tester) async {
-    final tempDir = Directory.systemTemp.createTempSync('source_panel_test');
-    addTearDown(() {
-      try {
-        tempDir.deleteSync(recursive: true);
-      } catch (_) {}
-    });
-    final storage = LocalStorage(rootDir: tempDir);
+  testWidgets(
+    'SourcePanel renders excerpt in markdown by default and can toggle to raw text',
+    (tester) async {
+      final tempDir = Directory.systemTemp.createTempSync('source_panel_test');
+      addTearDown(() {
+        try {
+          tempDir.deleteSync(recursive: true);
+        } catch (_) {}
+      });
+      final storage = LocalStorage(rootDir: tempDir);
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          localStorageProvider.overrideWithValue(storage),
-        ],
-        child: MaterialApp(
-          home: Scaffold(
-            body: SourcePanel(
-              citation: citation,
-              onClose: () {},
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [localStorageProvider.overrideWithValue(storage)],
+          child: MaterialApp(
+            home: Scaffold(
+              body: SourcePanel(citation: citation, onClose: () {}),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
 
-    // Verify MarkdownBody is present by default
-    expect(find.byType(MarkdownBody), findsOneWidget);
-    expect(find.textContaining('From RAG to Memory', findRichText: true), findsWidgets);
-    expect(find.textContaining('2.2. Non-Parametric Continual Learning for LLMs', findRichText: true), findsOneWidget);
+      // Verify MarkdownBody is present by default
+      expect(find.byType(MarkdownBody), findsOneWidget);
+      expect(
+        find.textContaining('From RAG to Memory', findRichText: true),
+        findsWidgets,
+      );
+      expect(
+        find.textContaining(
+          '2.2. Non-Parametric Continual Learning for LLMs',
+          findRichText: true,
+        ),
+        findsOneWidget,
+      );
 
-    // Find the toggle button
-    final toggleBtn = find.byTooltip('View raw text');
-    expect(toggleBtn, findsOneWidget);
+      // Find the toggle button
+      final toggleBtn = find.byTooltip('View raw text');
+      expect(toggleBtn, findsOneWidget);
 
-    // Tap toggle to raw text
-    await tester.tap(toggleBtn);
-    await tester.pumpAndSettle();
+      // Tap toggle to raw text
+      await tester.tap(toggleBtn);
+      await tester.pumpAndSettle();
 
-    // Now MarkdownBody should not be present, raw text view is active
-    expect(find.byType(MarkdownBody), findsNothing);
-    expect(find.byTooltip('View formatted markdown'), findsOneWidget);
+      // Now MarkdownBody should not be present, raw text view is active
+      expect(find.byType(MarkdownBody), findsNothing);
+      expect(find.byTooltip('View formatted markdown'), findsOneWidget);
 
-    // Tap toggle back to markdown
-    await tester.tap(find.byTooltip('View formatted markdown'));
-    await tester.pumpAndSettle();
-    expect(find.byType(MarkdownBody), findsOneWidget);
-  });
+      // Tap toggle back to markdown
+      await tester.tap(find.byTooltip('View formatted markdown'));
+      await tester.pumpAndSettle();
+      expect(find.byType(MarkdownBody), findsOneWidget);
+    },
+  );
 }

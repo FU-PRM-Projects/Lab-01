@@ -3,6 +3,7 @@ import 'package:lab_05/data/models/chat.dart';
 import 'package:lab_05/data/models/citation.dart';
 import 'package:lab_05/data/models/collection.dart';
 import 'package:lab_05/data/models/paper.dart';
+import 'package:lab_05/data/models/tool_call_record.dart';
 
 void main() {
   group('Models JSON Roundtrip Tests', () {
@@ -140,6 +141,48 @@ void main() {
       expect(roundtrip.messages.first.role, equals('assistant'));
       expect(roundtrip.messages.first.citations.length, equals(1));
       expect(roundtrip.messages.first.citations.first.sourceId, equals('S1'));
+    });
+
+    test('Tool calls survive a chat round trip', () {
+      final message = ChatMessage(
+        id: 'msg_1',
+        role: 'assistant',
+        content: 'Answer [S1].',
+        createdAt: DateTime.utc(2026, 9, 14, 8, 10, 0),
+        toolCalls: const [
+          ToolCallRecord(
+            id: 'call-1',
+            name: 'read_page',
+            arguments: {'documentId': 'doc_1', 'page': 3},
+            status: ToolCallRecord.statusOk,
+            summary: '2 passages',
+            resultPreview: '[S1] HippoRAG, PDF page 3',
+            durationMs: 120,
+          ),
+          // Saved mid-flight, e.g. when the turn was stopped.
+          ToolCallRecord(id: 'call-2', name: 'list_papers'),
+        ],
+      );
+
+      final chat = Chat(
+        id: 'chat_1',
+        collectionId: 'col_123',
+        title: 'HippoRAG Discussion',
+        createdAt: DateTime.utc(2026, 9, 14, 8, 10, 0),
+        updatedAt: DateTime.utc(2026, 9, 14, 8, 11, 0),
+        messages: [message],
+      );
+
+      final calls = Chat.fromJson(chat.toJson()).messages.first.toolCalls;
+      expect(calls.length, equals(2));
+      expect(calls.first.name, equals('read_page'));
+      expect(calls.first.arguments, equals({'documentId': 'doc_1', 'page': 3}));
+      expect(calls.first.summary, equals('2 passages'));
+      expect(calls.first.resultPreview, equals('[S1] HippoRAG, PDF page 3'));
+      expect(calls.first.durationMs, equals(120));
+      // A call that never settled must not spin forever when restored.
+      expect(calls.last.isRunning, isFalse);
+      expect(calls.last.isFailed, isTrue);
     });
   });
 }

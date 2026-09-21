@@ -1,4 +1,5 @@
 import 'package:lab_05/data/models/citation.dart';
+import 'package:lab_05/data/models/tool_call_record.dart';
 
 class ChatMessage {
   final String id;
@@ -9,6 +10,10 @@ class ChatMessage {
   final String? model;
   final List<Citation> citations;
 
+  /// Tools the agent ran while producing this message, in the order it ran
+  /// them. Always empty for user messages.
+  final List<ToolCallRecord> toolCalls;
+
   const ChatMessage({
     required this.id,
     required this.role,
@@ -17,6 +22,7 @@ class ChatMessage {
     required this.createdAt,
     this.model,
     this.citations = const [],
+    this.toolCalls = const [],
   });
 
   ChatMessage copyWith({
@@ -24,6 +30,7 @@ class ChatMessage {
     String? content,
     List<Citation>? citations,
     String? model,
+    List<ToolCallRecord>? toolCalls,
   }) {
     return ChatMessage(
       id: id,
@@ -33,11 +40,13 @@ class ChatMessage {
       createdAt: createdAt,
       model: model ?? this.model,
       citations: citations ?? this.citations,
+      toolCalls: toolCalls ?? this.toolCalls,
     );
   }
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     final rawCitations = (json['citations'] as List<dynamic>?) ?? [];
+    final rawToolCalls = (json['toolCalls'] as List<dynamic>?) ?? [];
     return ChatMessage(
       id: json['id'] as String,
       role: json['role'] as String? ?? 'user',
@@ -49,6 +58,9 @@ class ChatMessage {
       model: json['model'] as String?,
       citations: rawCitations
           .map((c) => Citation.fromJson(c as Map<String, dynamic>))
+          .toList(),
+      toolCalls: rawToolCalls
+          .map((t) => ToolCallRecord.fromJson(t as Map<String, dynamic>))
           .toList(),
     );
   }
@@ -62,6 +74,7 @@ class ChatMessage {
       'createdAt': createdAt.toUtc().toIso8601String(),
       'model': model,
       'citations': citations.map((c) => c.toJson()).toList(),
+      'toolCalls': toolCalls.map((t) => t.toJson()).toList(),
     };
   }
 }

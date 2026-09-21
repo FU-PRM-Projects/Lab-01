@@ -89,7 +89,8 @@ class CrossrefMatch {
 /// Crossref asks callers to identify themselves; no key or account is needed
 /// and nothing but the reference string itself leaves the machine.
 class CrossrefClient {
-  static const String _userAgent = 'PaperChat/1.0 (research reference resolver)';
+  static const String _userAgent =
+      'PaperChat/1.0 (research reference resolver)';
 
   /// Below this Crossref score a "match" is usually a different paper.
   static const double minimumScore = 55;
@@ -98,9 +99,11 @@ class CrossrefClient {
   final Uri _baseUri;
   bool _closed = false;
 
-  CrossrefClient({http.Client? client, String baseUrl = 'https://api.crossref.org'})
-    : _client = client ?? http.Client(),
-      _baseUri = Uri.parse(baseUrl);
+  CrossrefClient({
+    http.Client? client,
+    String baseUrl = 'https://api.crossref.org',
+  }) : _client = client ?? http.Client(),
+       _baseUri = Uri.parse(baseUrl);
 
   Future<CrossrefMatch?> resolve(String bibliographicText) async {
     final query = bibliographicText.trim();
@@ -130,7 +133,8 @@ class CrossrefClient {
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     final items =
-        ((body['message'] as Map<String, dynamic>?)?['items'] as List<dynamic>?) ??
+        ((body['message'] as Map<String, dynamic>?)?['items']
+            as List<dynamic>?) ??
         const [];
     if (items.isEmpty) return null;
 

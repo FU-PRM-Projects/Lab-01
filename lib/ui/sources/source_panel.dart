@@ -251,7 +251,9 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
                   size: 16,
                   color: colorScheme.onSurfaceVariant,
                 ),
-                tooltip: _renderMarkdown ? 'View raw text' : 'View formatted markdown',
+                tooltip: _renderMarkdown
+                    ? 'View raw text'
+                    : 'View formatted markdown',
                 visualDensity: VisualDensity.compact,
                 onPressed: () {
                   setState(() {
@@ -307,8 +309,12 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
                             if (href != null) {
                               final uri = Uri.tryParse(href);
                               if (uri != null &&
-                                  (uri.scheme == 'http' || uri.scheme == 'https')) {
-                                launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  (uri.scheme == 'http' ||
+                                      uri.scheme == 'https')) {
+                                launchUrl(
+                                  uri,
+                                  mode: LaunchMode.externalApplication,
+                                );
                               }
                             }
                           },
@@ -333,7 +339,9 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
               decoration: BoxDecoration(
                 color: colorScheme.errorContainer.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: colorScheme.error.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: colorScheme.error.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
@@ -427,7 +435,10 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
         borderRadius: BorderRadius.circular(6),
         border: Border(left: BorderSide(color: colorScheme.primary, width: 3)),
       ),
-      blockquotePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      blockquotePadding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 6,
+      ),
       tableBorder: TableBorder.all(
         color: colorScheme.outlineVariant,
         width: 1,
@@ -455,7 +466,11 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
     var text = raw;
     text = text.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
     text = text.replaceAllMapped(
-      RegExp(r'<(?:b|strong)>(.*?)</(?:b|strong)>', caseSensitive: false, dotAll: true),
+      RegExp(
+        r'<(?:b|strong)>(.*?)</(?:b|strong)>',
+        caseSensitive: false,
+        dotAll: true,
+      ),
       (m) => '**${m[1]}**',
     );
     text = text.replaceAllMapped(
@@ -463,7 +478,11 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
       (m) => '*${m[1]}*',
     );
     text = text.replaceAllMapped(
-      RegExp(r'<(?:del|s)>(.*?)</(?:del|s)>', caseSensitive: false, dotAll: true),
+      RegExp(
+        r'<(?:del|s)>(.*?)</(?:del|s)>',
+        caseSensitive: false,
+        dotAll: true,
+      ),
       (m) => '~~${m[1]}~~',
     );
     text = text.replaceAllMapped(
@@ -499,9 +518,7 @@ class _UnderlineBuilder extends MarkdownElementBuilder {
     return Text.rich(
       TextSpan(
         text: element.textContent,
-        style: preferredStyle?.copyWith(
-          decoration: TextDecoration.underline,
-        ),
+        style: preferredStyle?.copyWith(decoration: TextDecoration.underline),
       ),
     );
   }

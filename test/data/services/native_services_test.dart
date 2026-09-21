@@ -10,7 +10,6 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lab_05/data/services/collection_index.dart';
 import 'package:lab_05/data/models/paper.dart';
-import 'package:lab_05_rust/paper_native.dart' as rust_pdf;
 import 'package:lab_05_rust/paper_native.dart';
 
 void main() {
@@ -159,25 +158,16 @@ void main() {
         endChar: 1,
         text: 'a',
       );
-      await indexA.add(
-        [chunk],
-        [List<double>.filled(8, 0.5)],
-      );
+      await indexA.add([chunk], [List<double>.filled(8, 0.5)]);
       expect(indexA.length, 1);
       expect(indexB.length, 0);
       await expectLater(
-        indexA.add(
-          [chunk],
-          [List<double>.filled(8, 0.5)],
-        ),
+        indexA.add([chunk], [List<double>.filled(8, 0.5)]),
         throwsA(anything),
       );
       expect(indexA.length, 1);
       await expectLater(
-        indexB.add(
-          [chunk],
-          [List<double>.filled(8, 0.5)],
-        ),
+        indexB.add([chunk], [List<double>.filled(8, 0.5)]),
         throwsArgumentError,
       );
       expect(indexB.length, 0);
@@ -198,25 +188,4 @@ void main() {
       expect(index.isOpen, isFalse);
     },
   );
-
-  group('Rust PDF Chunking Tests', () {
-    test('chunkText splits text preserving offsets and section', () async {
-      const shortText = 'Antigravity Rust PDF Inspector pipeline.';
-      final chunks = await rust_pdf.chunkText(
-        pageText: shortText,
-        pageNum: 1,
-        documentId: 'doc_test',
-        section: 'Introduction',
-        startOrdinal: 0,
-      );
-
-      expect(chunks.length, equals(1));
-      expect(chunks[0].id, equals('doc_test:p1:c0'));
-      expect(chunks[0].text, equals(shortText));
-      expect(chunks[0].page, equals(1));
-      expect(chunks[0].section, equals('Introduction'));
-      expect(chunks[0].startChar, equals(0));
-      expect(chunks[0].endChar, equals(shortText.length));
-    });
-  });
 }

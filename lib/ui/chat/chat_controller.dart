@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/chat.dart';
 import 'package:lab_05/data/models/citation.dart';
+import 'package:lab_05/data/models/tool_call_record.dart';
 import 'package:lab_05/data/services/embedding_client.dart';
 import 'package:lab_05/domain/research_agent.dart';
 
@@ -15,6 +16,9 @@ class ChatState {
   final String? statusMessage;
   final String? streamingText;
   final Map<String, Citation> streamingSources;
+
+  /// Tools run so far in this turn, oldest first. Running calls are included.
+  final List<ToolCallRecord> toolCalls;
   final String? errorMessage;
 
   const ChatState({
@@ -22,6 +26,7 @@ class ChatState {
     this.statusMessage,
     this.streamingText,
     this.streamingSources = const {},
+    this.toolCalls = const [],
     this.errorMessage,
   });
 
@@ -30,6 +35,7 @@ class ChatState {
     String? statusMessage,
     String? streamingText,
     Map<String, Citation>? streamingSources,
+    List<ToolCallRecord>? toolCalls,
     String? errorMessage,
   }) {
     return ChatState(
@@ -37,6 +43,7 @@ class ChatState {
       statusMessage: statusMessage,
       streamingText: streamingText ?? this.streamingText,
       streamingSources: streamingSources ?? this.streamingSources,
+      toolCalls: toolCalls ?? this.toolCalls,
       errorMessage: errorMessage,
     );
   }
@@ -124,9 +131,7 @@ class ChatController extends StateNotifier<ChatState> {
       final turn = _ChatTurn(updated, settings.chatModel);
       _turn = turn;
       unawaited(
-        _ref
-            .read(projectChatsProvider(collection.id).notifier)
-            .refresh(),
+        _ref.read(projectChatsProvider(collection.id).notifier).refresh(),
       );
       final index = await _ref
           .read(paperRepositoryProvider(collection.id))
@@ -154,6 +159,7 @@ class ChatController extends StateNotifier<ChatState> {
           state = state.copyWith(
             streamingText: turn.text.toString(),
             streamingSources: turn.sources,
+            toolCalls: turn.snapshot(),
           );
           pendingUpdate = false;
         }
@@ -170,6 +176,18 @@ class ChatController extends StateNotifier<ChatState> {
               switch (event) {
                 case ToolStatus(:final message):
                   state = state.copyWith(statusMessage: message);
+                case ToolCallStarted(:final call):
+                  turn.toolCalls.add(call);
+                  state = state.copyWith(
+                    statusMessage: state.statusMessage,
+                    toolCalls: turn.snapshot(),
+                  );
+                case ToolCallFinished(:final call):
+                  turn.settle(call);
+                  state = state.copyWith(
+                    statusMessage: state.statusMessage,
+                    toolCalls: turn.snapshot(),
+                  );
                 case SourcesUpdated(:final sourceMap):
                   turn.sources = sourceMap;
                   pendingUpdate = true;
@@ -181,6 +199,7 @@ class ChatController extends StateNotifier<ChatState> {
                       statusMessage: null,
                       streamingText: turn.text.toString(),
                       streamingSources: turn.sources,
+                      toolCalls: turn.snapshot(),
                     );
                   } else {
                     pendingUpdate = true;
@@ -227,6 +246,7 @@ class ChatController extends StateNotifier<ChatState> {
             createdAt: DateTime.now().toUtc(),
             model: turn.model,
             citations: turn.sources.values.toList(growable: false),
+            toolCalls: turn.snapshot(),
           ),
         ],
       );
@@ -256,6 +276,21 @@ class _ChatTurn {
   final String model;
   final text = StringBuffer();
   Map<String, Citation> sources = const {};
+  final toolCalls = <ToolCallRecord>[];
+
+  /// Replaces the running record for a settled call, keeping its position in
+  /// the log. An id the turn has not seen is appended rather than dropped.
+  void settle(ToolCallRecord call) {
+    final at = toolCalls.indexWhere((existing) => existing.id == call.id);
+    if (at == -1) {
+      toolCalls.add(call);
+    } else {
+      toolCalls[at] = call;
+    }
+  }
+
+  /// A copy for the immutable state, so later mutations do not edit it in place.
+  List<ToolCallRecord> snapshot() => List.unmodifiable(toolCalls);
 }
 
 final chatControllerProvider = StateNotifierProvider<ChatController, ChatState>(

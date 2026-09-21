@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1922943509;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1449220834;
 
 // Section: executor
 
@@ -436,7 +436,7 @@ fn wire__crate__api__vector_index__NativeVectorIndex_write_impl(
         },
     )
 }
-fn wire__crate__api__pdf_parser__chunk_text_impl(
+fn wire__crate__api__pdf_images__extract_and_strip_images_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -444,7 +444,7 @@ fn wire__crate__api__pdf_parser__chunk_text_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "chunk_text",
+            debug_name: "extract_and_strip_images",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -458,21 +458,17 @@ fn wire__crate__api__pdf_parser__chunk_text_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_page_text = <String>::sse_decode(&mut deserializer);
-            let api_page_num = <i32>::sse_decode(&mut deserializer);
-            let api_document_id = <String>::sse_decode(&mut deserializer);
-            let api_section = <String>::sse_decode(&mut deserializer);
-            let api_start_ordinal = <i32>::sse_decode(&mut deserializer);
+            let api_pdf_path = <String>::sse_decode(&mut deserializer);
+            let api_min_width = <u32>::sse_decode(&mut deserializer);
+            let api_min_height = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Ok::<_, ()>(crate::api::pdf_parser::chunk_text(
-                        &api_page_text,
-                        api_page_num,
-                        &api_document_id,
-                        &api_section,
-                        api_start_ordinal,
-                    ))?;
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::pdf_images::extract_and_strip_images(
+                        api_pdf_path,
+                        api_min_width,
+                        api_min_height,
+                    )?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -507,45 +503,6 @@ fn wire__crate__api__init_app_impl(
                     let output_ok = Ok::<_, ()>({
                         crate::api::init_app();
                     })?;
-                    std::result::Result::Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__pdf_parser__parse_pdf_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "parse_pdf",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_file_path = <String>::sse_decode(&mut deserializer);
-            let api_document_id = <String>::sse_decode(&mut deserializer);
-            let api_fallback_title = <Option<String>>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, String>((move || {
-                    let output_ok = crate::api::pdf_parser::parse_pdf(
-                        api_file_path,
-                        api_document_id,
-                        api_fallback_title,
-                    )?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -596,24 +553,32 @@ impl SseDecode for bool {
     }
 }
 
+impl SseDecode for crate::api::pdf_images::ExtractedImage {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_page = <u32>::sse_decode(deserializer);
+        let mut var_indexOnPage = <u32>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_width = <u32>::sse_decode(deserializer);
+        let mut var_height = <u32>::sse_decode(deserializer);
+        let mut var_mediaType = <String>::sse_decode(deserializer);
+        let mut var_bytes = <Vec<u8>>::sse_decode(deserializer);
+        return crate::api::pdf_images::ExtractedImage {
+            page: var_page,
+            index_on_page: var_indexOnPage,
+            name: var_name,
+            width: var_width,
+            height: var_height,
+            media_type: var_mediaType,
+            bytes: var_bytes,
+        };
+    }
+}
+
 impl SseDecode for f32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         deserializer.cursor.read_f32::<NativeEndian>().unwrap()
-    }
-}
-
-impl SseDecode for i32 {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        deserializer.cursor.read_i32::<NativeEndian>().unwrap()
-    }
-}
-
-impl SseDecode for i64 {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        deserializer.cursor.read_i64::<NativeEndian>().unwrap()
     }
 }
 
@@ -624,6 +589,20 @@ impl SseDecode for Vec<u64> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<u64>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::pdf_images::ExtractedImage> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::pdf_images::ExtractedImage>::sse_decode(
+                deserializer,
+            ));
         }
         return ans_;
     }
@@ -641,18 +620,6 @@ impl SseDecode for Vec<f32> {
     }
 }
 
-impl SseDecode for Vec<i32> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut len_ = <i32>::sse_decode(deserializer);
-        let mut ans_ = Vec::with_capacity(len_ as usize);
-        for idx_ in 0..len_ {
-            ans_.push(<i32>::sse_decode(deserializer));
-        }
-        return ans_;
-    }
-}
-
 impl SseDecode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -660,20 +627,6 @@ impl SseDecode for Vec<u8> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<u8>::sse_decode(deserializer));
-        }
-        return ans_;
-    }
-}
-
-impl SseDecode for Vec<crate::api::pdf_parser::RustPaperChunk> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut len_ = <i32>::sse_decode(deserializer);
-        let mut ans_ = Vec::with_capacity(len_ as usize);
-        for idx_ in 0..len_ {
-            ans_.push(<crate::api::pdf_parser::RustPaperChunk>::sse_decode(
-                deserializer,
-            ));
         }
         return ans_;
     }
@@ -693,17 +646,6 @@ impl SseDecode for Vec<crate::api::vector_index::RustSearchResult> {
     }
 }
 
-impl SseDecode for Option<String> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        if (<bool>::sse_decode(deserializer)) {
-            return Some(<String>::sse_decode(deserializer));
-        } else {
-            return None;
-        }
-    }
-}
-
 impl SseDecode for Option<Vec<u64>> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -712,51 +654,6 @@ impl SseDecode for Option<Vec<u64>> {
         } else {
             return None;
         }
-    }
-}
-
-impl SseDecode for crate::api::pdf_parser::RustPaperChunk {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_id = <String>::sse_decode(deserializer);
-        let mut var_vectorId = <i64>::sse_decode(deserializer);
-        let mut var_page = <i32>::sse_decode(deserializer);
-        let mut var_ordinal = <i32>::sse_decode(deserializer);
-        let mut var_section = <String>::sse_decode(deserializer);
-        let mut var_startChar = <i32>::sse_decode(deserializer);
-        let mut var_endChar = <i32>::sse_decode(deserializer);
-        let mut var_text = <String>::sse_decode(deserializer);
-        return crate::api::pdf_parser::RustPaperChunk {
-            id: var_id,
-            vector_id: var_vectorId,
-            page: var_page,
-            ordinal: var_ordinal,
-            section: var_section,
-            start_char: var_startChar,
-            end_char: var_endChar,
-            text: var_text,
-        };
-    }
-}
-
-impl SseDecode for crate::api::pdf_parser::RustPdfProcessedResult {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_title = <String>::sse_decode(deserializer);
-        let mut var_pageCount = <i32>::sse_decode(deserializer);
-        let mut var_chunks =
-            <Vec<crate::api::pdf_parser::RustPaperChunk>>::sse_decode(deserializer);
-        let mut var_emptyPages = <Vec<i32>>::sse_decode(deserializer);
-        let mut var_pdfType = <String>::sse_decode(deserializer);
-        let mut var_needsOcrPages = <Vec<i32>>::sse_decode(deserializer);
-        return crate::api::pdf_parser::RustPdfProcessedResult {
-            title: var_title,
-            page_count: var_pageCount,
-            chunks: var_chunks,
-            empty_pages: var_emptyPages,
-            pdf_type: var_pdfType,
-            needs_ocr_pages: var_needsOcrPages,
-        };
     }
 }
 
@@ -769,6 +666,32 @@ impl SseDecode for crate::api::vector_index::RustSearchResult {
             vector_id: var_vectorId,
             score: var_score,
         };
+    }
+}
+
+impl SseDecode for crate::api::pdf_images::StrippedPdf {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_pdf = <Vec<u8>>::sse_decode(deserializer);
+        let mut var_images =
+            <Vec<crate::api::pdf_images::ExtractedImage>>::sse_decode(deserializer);
+        let mut var_pageCount = <u32>::sse_decode(deserializer);
+        let mut var_originalBytes = <u64>::sse_decode(deserializer);
+        let mut var_skipped = <u32>::sse_decode(deserializer);
+        return crate::api::pdf_images::StrippedPdf {
+            pdf: var_pdf,
+            images: var_images,
+            page_count: var_pageCount,
+            original_bytes: var_originalBytes,
+            skipped: var_skipped,
+        };
+    }
+}
+
+impl SseDecode for u32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u32::<NativeEndian>().unwrap()
     }
 }
 
@@ -795,6 +718,13 @@ impl SseDecode for usize {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         deserializer.cursor.read_u64::<NativeEndian>().unwrap() as _
+    }
+}
+
+impl SseDecode for i32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_i32::<NativeEndian>().unwrap()
     }
 }
 
@@ -855,9 +785,13 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        9 => wire__crate__api__pdf_parser__chunk_text_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__pdf_images__extract_and_strip_images_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
         10 => wire__crate__api__init_app_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__pdf_parser__parse_pdf_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -892,54 +826,28 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<NativeVectorIndex>> for Native
 }
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::pdf_parser::RustPaperChunk {
+impl flutter_rust_bridge::IntoDart for crate::api::pdf_images::ExtractedImage {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.id.into_into_dart().into_dart(),
-            self.vector_id.into_into_dart().into_dart(),
             self.page.into_into_dart().into_dart(),
-            self.ordinal.into_into_dart().into_dart(),
-            self.section.into_into_dart().into_dart(),
-            self.start_char.into_into_dart().into_dart(),
-            self.end_char.into_into_dart().into_dart(),
-            self.text.into_into_dart().into_dart(),
+            self.index_on_page.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.width.into_into_dart().into_dart(),
+            self.height.into_into_dart().into_dart(),
+            self.media_type.into_into_dart().into_dart(),
+            self.bytes.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::pdf_parser::RustPaperChunk
+    for crate::api::pdf_images::ExtractedImage
 {
 }
-impl flutter_rust_bridge::IntoIntoDart<crate::api::pdf_parser::RustPaperChunk>
-    for crate::api::pdf_parser::RustPaperChunk
+impl flutter_rust_bridge::IntoIntoDart<crate::api::pdf_images::ExtractedImage>
+    for crate::api::pdf_images::ExtractedImage
 {
-    fn into_into_dart(self) -> crate::api::pdf_parser::RustPaperChunk {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::pdf_parser::RustPdfProcessedResult {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.title.into_into_dart().into_dart(),
-            self.page_count.into_into_dart().into_dart(),
-            self.chunks.into_into_dart().into_dart(),
-            self.empty_pages.into_into_dart().into_dart(),
-            self.pdf_type.into_into_dart().into_dart(),
-            self.needs_ocr_pages.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::pdf_parser::RustPdfProcessedResult
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::pdf_parser::RustPdfProcessedResult>
-    for crate::api::pdf_parser::RustPdfProcessedResult
-{
-    fn into_into_dart(self) -> crate::api::pdf_parser::RustPdfProcessedResult {
+    fn into_into_dart(self) -> crate::api::pdf_images::ExtractedImage {
         self
     }
 }
@@ -961,6 +869,30 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::vector_index::RustSearchResul
     for crate::api::vector_index::RustSearchResult
 {
     fn into_into_dart(self) -> crate::api::vector_index::RustSearchResult {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::pdf_images::StrippedPdf {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.pdf.into_into_dart().into_dart(),
+            self.images.into_into_dart().into_dart(),
+            self.page_count.into_into_dart().into_dart(),
+            self.original_bytes.into_into_dart().into_dart(),
+            self.skipped.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::pdf_images::StrippedPdf
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::pdf_images::StrippedPdf>
+    for crate::api::pdf_images::StrippedPdf
+{
+    fn into_into_dart(self) -> crate::api::pdf_images::StrippedPdf {
         self
     }
 }
@@ -997,24 +929,23 @@ impl SseEncode for bool {
     }
 }
 
+impl SseEncode for crate::api::pdf_images::ExtractedImage {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u32>::sse_encode(self.page, serializer);
+        <u32>::sse_encode(self.index_on_page, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <u32>::sse_encode(self.width, serializer);
+        <u32>::sse_encode(self.height, serializer);
+        <String>::sse_encode(self.media_type, serializer);
+        <Vec<u8>>::sse_encode(self.bytes, serializer);
+    }
+}
+
 impl SseEncode for f32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_f32::<NativeEndian>(self).unwrap();
-    }
-}
-
-impl SseEncode for i32 {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        serializer.cursor.write_i32::<NativeEndian>(self).unwrap();
-    }
-}
-
-impl SseEncode for i64 {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        serializer.cursor.write_i64::<NativeEndian>(self).unwrap();
     }
 }
 
@@ -1024,6 +955,16 @@ impl SseEncode for Vec<u64> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <u64>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::pdf_images::ExtractedImage> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::pdf_images::ExtractedImage>::sse_encode(item, serializer);
         }
     }
 }
@@ -1038,32 +979,12 @@ impl SseEncode for Vec<f32> {
     }
 }
 
-impl SseEncode for Vec<i32> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <i32>::sse_encode(self.len() as _, serializer);
-        for item in self {
-            <i32>::sse_encode(item, serializer);
-        }
-    }
-}
-
 impl SseEncode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <u8>::sse_encode(item, serializer);
-        }
-    }
-}
-
-impl SseEncode for Vec<crate::api::pdf_parser::RustPaperChunk> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <i32>::sse_encode(self.len() as _, serializer);
-        for item in self {
-            <crate::api::pdf_parser::RustPaperChunk>::sse_encode(item, serializer);
         }
     }
 }
@@ -1078,16 +999,6 @@ impl SseEncode for Vec<crate::api::vector_index::RustSearchResult> {
     }
 }
 
-impl SseEncode for Option<String> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
-            <String>::sse_encode(value, serializer);
-        }
-    }
-}
-
 impl SseEncode for Option<Vec<u64>> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1098,37 +1009,29 @@ impl SseEncode for Option<Vec<u64>> {
     }
 }
 
-impl SseEncode for crate::api::pdf_parser::RustPaperChunk {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.id, serializer);
-        <i64>::sse_encode(self.vector_id, serializer);
-        <i32>::sse_encode(self.page, serializer);
-        <i32>::sse_encode(self.ordinal, serializer);
-        <String>::sse_encode(self.section, serializer);
-        <i32>::sse_encode(self.start_char, serializer);
-        <i32>::sse_encode(self.end_char, serializer);
-        <String>::sse_encode(self.text, serializer);
-    }
-}
-
-impl SseEncode for crate::api::pdf_parser::RustPdfProcessedResult {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.title, serializer);
-        <i32>::sse_encode(self.page_count, serializer);
-        <Vec<crate::api::pdf_parser::RustPaperChunk>>::sse_encode(self.chunks, serializer);
-        <Vec<i32>>::sse_encode(self.empty_pages, serializer);
-        <String>::sse_encode(self.pdf_type, serializer);
-        <Vec<i32>>::sse_encode(self.needs_ocr_pages, serializer);
-    }
-}
-
 impl SseEncode for crate::api::vector_index::RustSearchResult {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <u64>::sse_encode(self.vector_id, serializer);
         <f32>::sse_encode(self.score, serializer);
+    }
+}
+
+impl SseEncode for crate::api::pdf_images::StrippedPdf {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<u8>>::sse_encode(self.pdf, serializer);
+        <Vec<crate::api::pdf_images::ExtractedImage>>::sse_encode(self.images, serializer);
+        <u32>::sse_encode(self.page_count, serializer);
+        <u64>::sse_encode(self.original_bytes, serializer);
+        <u32>::sse_encode(self.skipped, serializer);
+    }
+}
+
+impl SseEncode for u32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u32::<NativeEndian>(self).unwrap();
     }
 }
 
@@ -1158,6 +1061,13 @@ impl SseEncode for usize {
             .cursor
             .write_u64::<NativeEndian>(self as _)
             .unwrap();
+    }
+}
+
+impl SseEncode for i32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_i32::<NativeEndian>(self).unwrap();
     }
 }
 

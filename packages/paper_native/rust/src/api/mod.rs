@@ -1,4 +1,4 @@
-pub mod pdf_parser;
+pub mod pdf_images;
 pub mod vector_index;
 
 #[flutter_rust_bridge::frb(init)]

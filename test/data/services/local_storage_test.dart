@@ -172,7 +172,10 @@ void main() {
 
       // Initially, custom path is null or whatever was set; setting custom path persists it
       await LocalStorage.setCustomDataDirectoryPath(customDir.path);
-      expect(await LocalStorage.getCustomDataDirectoryPath(), equals(customDir.path));
+      expect(
+        await LocalStorage.getCustomDataDirectoryPath(),
+        equals(customDir.path),
+      );
 
       // Resolves to custom path when overrideDir is not provided
       final resolved = await LocalStorage.resolveDataDirectory();
@@ -185,7 +188,9 @@ void main() {
           overrideDir.deleteSync(recursive: true);
         } catch (_) {}
       });
-      final resolvedOverride = await LocalStorage.resolveDataDirectory(overrideDir);
+      final resolvedOverride = await LocalStorage.resolveDataDirectory(
+        overrideDir,
+      );
       expect(resolvedOverride.path, equals(overrideDir.path));
 
       // Reset to default (null) clears the custom path
@@ -197,22 +202,25 @@ void main() {
       expect(resolvedDefault.path, equals(defaultDir.path));
     });
 
-    test('LocalStorage.createForDirectory initializes directory structure', () async {
-      final newDir = Directory.systemTemp.createTempSync('new_storage_dir');
-      addTearDown(() {
-        try {
-          newDir.deleteSync(recursive: true);
-        } catch (_) {}
-      });
+    test(
+      'LocalStorage.createForDirectory initializes directory structure',
+      () async {
+        final newDir = Directory.systemTemp.createTempSync('new_storage_dir');
+        addTearDown(() {
+          try {
+            newDir.deleteSync(recursive: true);
+          } catch (_) {}
+        });
 
-      final newStorage = await LocalStorage.createForDirectory(newDir);
-      addTearDown(newStorage.dispose);
+        final newStorage = await LocalStorage.createForDirectory(newDir);
+        addTearDown(newStorage.dispose);
 
-      expect(newStorage.rootDir.path, equals(newDir.path));
-      expect(newDir.existsSync(), isTrue);
+        expect(newStorage.rootDir.path, equals(newDir.path));
+        expect(newDir.existsSync(), isTrue);
 
-      final settings = await newStorage.loadSettings();
-      expect(settings, isNotNull);
-    });
+        final settings = await newStorage.loadSettings();
+        expect(settings, isNotNull);
+      },
+    );
   });
 }

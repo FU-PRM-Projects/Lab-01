@@ -53,7 +53,9 @@ impl NativeVectorIndex {
         let mut inner = self.inner.write().map_err(|e| e.to_string())?;
         if let Some(existing) = inner.dim_opt() {
             if existing != dim {
-                return Err(format!("Dimension mismatch: expected {existing}, got {dim}"));
+                return Err(format!(
+                    "Dimension mismatch: expected {existing}, got {dim}"
+                ));
             }
         }
 
@@ -164,7 +166,9 @@ mod tests {
         let mut state = seed | 1;
         (0..n * DIM)
             .map(|_| {
-                state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                state = state
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 ((state >> 33) as f32 / (1u64 << 31) as f32) - 1.0
             })
             .collect()
@@ -194,9 +198,7 @@ mod tests {
         assert!(results[1].score >= results[2].score);
 
         // The allowlist restricts the candidate set.
-        let filtered = index
-            .search(row(&vectors, 2), 5, Some(vec![5, 7]))
-            .unwrap();
+        let filtered = index.search(row(&vectors, 2), 5, Some(vec![5, 7])).unwrap();
         assert_eq!(filtered.len(), 2);
         let returned: HashSet<u64> = filtered.iter().map(|r| r.vector_id).collect();
         assert_eq!(returned, HashSet::from([5, 7]));
@@ -253,19 +255,22 @@ mod tests {
         let duplicate = index.add_batch(vec![2], synth(1, 12), DIM).unwrap_err();
         assert!(duplicate.contains("Duplicate vector ID"), "{duplicate}");
 
-        let in_batch = index
-            .add_batch(vec![9, 9], synth(2, 13), DIM)
-            .unwrap_err();
+        let in_batch = index.add_batch(vec![9, 9], synth(2, 13), DIM).unwrap_err();
         assert!(in_batch.contains("Duplicate vector ID"), "{in_batch}");
 
-        let short = index.add_batch(vec![3], vec![0.5; DIM - 1], DIM).unwrap_err();
+        let short = index
+            .add_batch(vec![3], vec![0.5; DIM - 1], DIM)
+            .unwrap_err();
         assert!(short.contains("Vector buffer size mismatch"), "{short}");
 
         let zero = index.add_batch(vec![4], vec![0.0; DIM], DIM).unwrap_err();
         assert!(zero.contains("finite non-zero"), "{zero}");
 
         let query_dim = index.search(vec![1.0; DIM + 1], 1, None).unwrap_err();
-        assert!(query_dim.contains("Query dimension mismatch"), "{query_dim}");
+        assert!(
+            query_dim.contains("Query dimension mismatch"),
+            "{query_dim}"
+        );
 
         // An unsupported bit width is rejected at construction.
         assert!(NativeVectorIndex::new(DIM, 8).is_err());

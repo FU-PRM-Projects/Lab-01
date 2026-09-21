@@ -3,38 +3,46 @@ import 'dart:ui' as ui;
 
 import 'package:pdfrx/pdfrx.dart';
 
-/// Renders PDF pages to PNG using the low-level pdfrx API
-/// (no PdfViewer widget). Used to feed scanned pages to vision OCR.
-class PageRenderService {
-  const PageRenderService({this.dpi = 150});
+/// Supplies one PDF's pages as images, one at a time.
+///
+/// The indexing pipeline only needs "how many pages" and "give me page N as a
+/// PNG", so it depends on this rather than on pdfrx directly — which also lets
+/// tests drive the pipeline without a real PDF.
+abstract class PdfPageImages {
+  /// Opens [filePath] and returns its page count.
+  Future<int> open(String filePath);
+
+  /// Renders [pageNumber] (1-based) as PNG bytes.
+  Future<Uint8List> renderPage(int pageNumber);
+
+  /// Releases the document. Safe to call more than once.
+  Future<void> close();
+}
+
+/// Renders PDF pages to PNG with the low-level pdfrx API (no PdfViewer
+/// widget), so pages can be fed to a multimodal model for transcription.
+class PageRenderService implements PdfPageImages {
+  PageRenderService({this.dpi = 150});
 
   final double dpi;
+  PdfDocument? _document;
 
-  /// Opens [filePath] for rendering several pages. The caller owns the
-  /// returned document and must call `dispose()` when done.
-  Future<PdfDocument> openDocument(String filePath) async {
+  @override
+  Future<int> open(String filePath) async {
+    await close();
     await pdfrxFlutterInitialize();
-    return PdfDocument.openFile(filePath);
+    final document = await PdfDocument.openFile(filePath);
+    _document = document;
+    return document.pages.length;
   }
 
-  /// Renders [pageNumber] (1-based) of [filePath] as PNG bytes at [dpi].
-  /// Opens and closes the document itself; use [openDocument] and
-  /// [renderDocumentPage] when rendering several pages of the same file.
-  Future<Uint8List> renderPage(String filePath, int pageNumber) async {
-    final document = await openDocument(filePath);
-    try {
-      return await renderDocumentPage(document, pageNumber);
-    } finally {
-      await document.dispose();
+  @override
+  Future<Uint8List> renderPage(int pageNumber) async {
+    final document = _document;
+    if (document == null) {
+      throw StateError('No PDF is open; call open() first.');
     }
-  }
 
-  /// Renders [pageNumber] (1-based) of an already open [document] as PNG
-  /// bytes at [dpi]. Does not close the document.
-  Future<Uint8List> renderDocumentPage(
-    PdfDocument document,
-    int pageNumber,
-  ) async {
     final pageCount = document.pages.length;
     if (pageNumber < 1 || pageNumber > pageCount) {
       throw RangeError.range(pageNumber, 1, pageCount, 'pageNumber');
@@ -70,5 +78,12 @@ class PageRenderService {
     } finally {
       image.dispose();
     }
+  }
+
+  @override
+  Future<void> close() async {
+    final document = _document;
+    _document = null;
+    await document?.dispose();
   }
 }

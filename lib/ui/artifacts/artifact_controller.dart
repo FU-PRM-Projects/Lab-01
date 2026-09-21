@@ -7,7 +7,8 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/data/services/crossref_client.dart';
-import 'package:lab_05/domain/reference_parser.dart';
+import 'package:lab_05/data/models/document_section.dart';
+import 'package:lab_05/data/models/reference.dart';
 
 /// Which artifact the panel is showing, for one chat.
 class ArtifactPanelView {
@@ -74,9 +75,10 @@ class ArtifactPanelNotifier
 }
 
 final artifactPanelProvider =
-    StateNotifierProvider<ArtifactPanelNotifier, Map<String, ArtifactPanelView>>(
-      (ref) => ArtifactPanelNotifier(),
-    );
+    StateNotifierProvider<
+      ArtifactPanelNotifier,
+      Map<String, ArtifactPanelView>
+    >((ref) => ArtifactPanelNotifier());
 
 /// The key of the artifact sidebar that belongs to the chat on screen. A chat
 /// that has not been saved yet still gets its own draft scope per collection.
@@ -128,15 +130,25 @@ final paperChunksProvider = Provider.family<List<PaperChunk>, String>((
   return List.unmodifiable(chunks);
 });
 
-/// Bibliography entries parsed out of the paper's own References section.
-final paperReferencesProvider = Provider.family<List<PaperReference>, String>((
+/// Sections of one paper in reading order.
+final paperSectionsProvider = Provider.family<List<DocumentSection>, String>((
   ref,
   documentId,
 ) {
   final paper = ref.watch(paperByIdProvider(documentId));
   if (paper == null) return const [];
-  if (paper.references.isNotEmpty) return paper.references;
-  return ReferenceParser.fromChunks(paper.chunks);
+  final sections = [...paper.sections]
+    ..sort((a, b) => a.ordinal.compareTo(b.ordinal));
+  return List.unmodifiable(sections);
+});
+
+/// Bibliography entries the instruct model extracted during indexing.
+final paperReferencesProvider = Provider.family<List<PaperReference>, String>((
+  ref,
+  documentId,
+) {
+  final paper = ref.watch(paperByIdProvider(documentId));
+  return paper?.references ?? const [];
 });
 
 class ResolvedReferencesState {
@@ -176,7 +188,8 @@ class ResolvedReferencesState {
 
 /// Looks bibliography entries up in Crossref and caches the answers on disk so
 /// each paper is only ever resolved once.
-class ResolvedReferencesNotifier extends StateNotifier<ResolvedReferencesState> {
+class ResolvedReferencesNotifier
+    extends StateNotifier<ResolvedReferencesState> {
   ResolvedReferencesNotifier(this._ref, this._documentId)
     : super(const ResolvedReferencesState()) {
     _loadCache();

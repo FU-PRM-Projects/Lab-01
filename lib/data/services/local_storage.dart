@@ -71,7 +71,9 @@ class LocalStorage {
     }
   }
 
-  static Future<Directory> resolveDataDirectory([Directory? overrideDir]) async {
+  static Future<Directory> resolveDataDirectory([
+    Directory? overrideDir,
+  ]) async {
     if (overrideDir != null) return overrideDir;
     final customPath = await getCustomDataDirectoryPath();
     if (customPath != null) {
@@ -141,6 +143,15 @@ class LocalStorage {
       p.join(metadataDir(collectionId), '$documentId.json');
   String referencesPath(String collectionId, String documentId) =>
       p.join(referencesDir(collectionId), '$documentId.json');
+
+  /// Directory holding one document's extracted figures.
+  String figuresDir(String collectionId, String documentId) =>
+      p.join(collectionDir(collectionId), 'figures', documentId);
+
+  /// Absolute path of a figure, given the name stored on its chunk.
+  String figurePath(String collectionId, String documentId, String name) =>
+      p.join(figuresDir(collectionId, documentId), name);
+
   String indexVectorsPath(String collectionId) =>
       p.join(indexDir(collectionId), 'vectors.tvim');
   String indexStatePath(String collectionId) =>

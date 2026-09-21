@@ -25,61 +25,64 @@ void main() {
       } catch (_) {}
     });
 
-    test('deletePaper removes metadata, PDF file, and cleans index state', () async {
-      final col = Collection(
-        id: 'col_del',
-        name: 'Delete Test',
-        createdAt: DateTime.now().toUtc(),
-        embeddingProfile: const EmbeddingProfile(id: 'p1', dimensions: 4),
-      );
-      await storage.saveCollection(col);
+    test(
+      'deletePaper removes metadata, PDF file, and cleans index state',
+      () async {
+        final col = Collection(
+          id: 'col_del',
+          name: 'Delete Test',
+          createdAt: DateTime.now().toUtc(),
+          embeddingProfile: const EmbeddingProfile(id: 'p1', dimensions: 4),
+        );
+        await storage.saveCollection(col);
 
-      final paper = PaperDocument(
-        schemaVersion: 1,
-        id: 'doc_del_1',
-        fileName: 'test.pdf',
-        title: 'Test Paper',
-        sha256: 'fakehash',
-        pageCount: 1,
-        status: DocumentStatus.ready,
-        createdAt: DateTime.now().toUtc(),
-        embeddingProfileId: 'p1',
-        chunks: const [
-          PaperChunk(
-            id: 'doc_del_1:p1:c0',
-            vectorId: 100,
-            page: 1,
-            ordinal: 0,
-            section: 'Intro',
-            startChar: 0,
-            endChar: 10,
-            text: 'Hello world',
-          ),
-        ],
-      );
-      await storage.savePaper(col.id, paper);
+        final paper = PaperDocument(
+          schemaVersion: 1,
+          id: 'doc_del_1',
+          fileName: 'test.pdf',
+          title: 'Test Paper',
+          sha256: 'fakehash',
+          pageCount: 1,
+          status: DocumentStatus.ready,
+          createdAt: DateTime.now().toUtc(),
+          embeddingProfileId: 'p1',
+          chunks: const [
+            PaperChunk(
+              id: 'doc_del_1:p1:c0',
+              vectorId: 100,
+              page: 1,
+              ordinal: 0,
+              section: 'Intro',
+              startChar: 0,
+              endChar: 10,
+              text: 'Hello world',
+            ),
+          ],
+        );
+        await storage.savePaper(col.id, paper);
 
-      // Create fake PDF file
-      final pdfFile = File(storage.paperPdfPath(col.id, paper.id));
-      await pdfFile.parent.create(recursive: true);
-      await pdfFile.writeAsString('fake pdf bytes');
-      expect(pdfFile.existsSync(), isTrue);
+        // Create fake PDF file
+        final pdfFile = File(storage.paperPdfPath(col.id, paper.id));
+        await pdfFile.parent.create(recursive: true);
+        await pdfFile.writeAsString('fake pdf bytes');
+        expect(pdfFile.existsSync(), isTrue);
 
-      final repo = PaperRepository(storage: storage, collectionId: col.id);
-      addTearDown(repo.close);
+        final repo = PaperRepository(storage: storage, collectionId: col.id);
+        addTearDown(repo.close);
 
-      // Verify paper is listed
-      var papers = await storage.listPapers(col.id);
-      expect(papers.length, equals(1));
+        // Verify paper is listed
+        var papers = await storage.listPapers(col.id);
+        expect(papers.length, equals(1));
 
-      // Delete paper
-      await repo.deletePaper(paper.id);
+        // Delete paper
+        await repo.deletePaper(paper.id);
 
-      // Verify paper is removed from listing and disk
-      papers = await storage.listPapers(col.id);
-      expect(papers.isEmpty, isTrue);
-      expect(pdfFile.existsSync(), isFalse);
-    });
+        // Verify paper is removed from listing and disk
+        papers = await storage.listPapers(col.id);
+        expect(papers.isEmpty, isTrue);
+        expect(pdfFile.existsSync(), isFalse);
+      },
+    );
 
     test('ChatsNotifier isolates chats per project collection', () async {
       final col1 = Collection(

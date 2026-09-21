@@ -1,41 +1,39 @@
 import 'package:path/path.dart' as p;
+import 'package:lab_05/data/models/document_figure.dart';
 import 'package:lab_05/data/models/index_state.dart';
 
 import 'dart:io';
-import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-import 'package:lab_05_rust/paper_native.dart' as rust_pdf;
 
+import 'package:lab_05/data/models/app_settings.dart';
+import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/data/services/collection_index.dart';
 import 'package:lab_05/data/services/embedding_client.dart';
-import 'package:lab_05/data/models/paper.dart';
-import 'package:lab_05/data/services/pdf_processor.dart';
+import 'package:lab_05/data/services/indexing_pipeline.dart';
 import 'package:lab_05/data/services/local_storage.dart';
-import 'package:lab_05/data/services/page_render_service.dart';
-import 'package:lab_05/data/services/vision_ocr_service.dart';
-import 'package:lab_05/data/services/instruct_document_service.dart';
-import 'package:lab_05/domain/reference_parser.dart';
 
 typedef ImportProgressCallback = void Function(String stage, double progress);
 
-class OcrProcessResult {
-  final List<PaperChunk> chunks;
-  final List<PaperReference> references;
-
-  const OcrProcessResult({
-    required this.chunks,
-    required this.references,
-  });
-}
+/// Builds the pipeline used for one import. Overridden in tests.
+typedef IndexingPipelineFactory = IndexingPipeline Function(
+  AppSettings settings,
+);
 
 class PaperRepository {
-  PaperRepository({required this.storage, required this.collectionId});
+  PaperRepository({
+    required this.storage,
+    required this.collectionId,
+    IndexingPipelineFactory? pipelineFactory,
+  }) : _pipelineFactory =
+           pipelineFactory ??
+           ((settings) => IndexingPipeline(settings: settings));
 
   final LocalStorage storage;
   final String collectionId;
+  final IndexingPipelineFactory _pipelineFactory;
   CollectionIndex? _index;
   Future<CollectionIndex>? _opening;
 
@@ -156,7 +154,6 @@ class PaperRepository {
 
     // 3. Create metadata with status: processing
     var paperDoc = PaperDocument(
-      schemaVersion: 1,
       id: documentId,
       fileName: originalFileName,
       title: p.basenameWithoutExtension(originalFileName).replaceAll('_', ' '),
@@ -165,147 +162,108 @@ class PaperRepository {
       status: DocumentStatus.processing,
       createdAt: DateTime.now().toUtc(),
       embeddingProfileId: embeddings.model,
-      chunks: const [],
     );
     await storage.savePaper(collectionId, paperDoc);
 
     try {
-      // 4. Extract pages and chunks
-      onProgress?.call('Extracting text and sections...', 0.3);
-      final extractResult = await PdfProcessor.processPdf(
-        targetPdfPath,
+      // 4. Transcribe every page, read the structure, cut the chunks.
+      final settings = await storage.loadSettings();
+      final indexed = await _pipelineFactory(settings).run(
+        pdfPath: targetPdfPath,
         documentId: documentId,
         fallbackTitle: paperDoc.title,
+        onProgress: (stage, progress) =>
+            // The pipeline owns the first 70% of the import; embedding and
+            // the native index own the rest.
+            onProgress?.call(stage, 0.1 + 0.6 * progress),
       );
 
-      final totalPages = extractResult.pageCount;
-      final ocrPages = extractResult.needsOcrPages;
-      final hasText = extractResult.chunks.isNotEmpty;
-      var chunksToIndex = extractResult.chunks;
-      var documentReferences = <PaperReference>[];
+      // 5. Save the figures and turn each into a chunk.
+      //
+      // A figure rides the same rails as a text passage from here on: it gets
+      // a vector id, goes into the same index and comes back from the same
+      // search. The only difference is that its vector is a joint embedding of
+      // the image and its caption, and that retrieval sends the image itself
+      // to the model.
+      final figureChunks = await _saveFigures(
+        collectionId: collectionId,
+        documentId: documentId,
+        figures: indexed.figures,
+      );
 
-      if (ocrPages.isNotEmpty) {
-        // Scanned or hybrid PDF: OCR the flagged pages before indexing.
-        debugPrint(
-          '[import] $documentId ($originalFileName): '
-          'pdfType=${extractResult.pdfType}, '
-          'totalPages=$totalPages, '
-          'needsOcr=${ocrPages.length} (pages: ${ocrPages.join(', ')}), '
-          'emptyPages=${extractResult.emptyPages.length}, '
-          'textChunks=${extractResult.chunks.length}',
-        );
-        final ocrResult = await _ocrPages(
-          pdfPath: targetPdfPath,
-          documentId: documentId,
-          pages: ocrPages,
-          totalPages: totalPages,
-          textChunks: extractResult.chunks,
-          onProgress: onProgress,
-        );
-        final ocrChunks = ocrResult.chunks;
-        documentReferences = ocrResult.references;
-
-        // A page that was OCR'd keeps only its OCR chunks, so text and OCR
-        // chunks never mix on the same page (their ordinals are unrelated).
-        final ocrPageSet = ocrChunks.map((c) => c.page).toSet();
-        final merged = [
-          ...extractResult.chunks.where((c) => !ocrPageSet.contains(c.page)),
-          ...ocrChunks,
-        ]..sort((a, b) {
-            final byPage = a.page.compareTo(b.page);
-            return byPage != 0 ? byPage : a.ordinal.compareTo(b.ordinal);
-          });
-        chunksToIndex = [
-          for (var i = 0; i < merged.length; i++)
-            PaperChunk(
-              id: merged[i].id,
-              vectorId: merged[i].vectorId,
-              page: merged[i].page,
-              ordinal: i,
-              section: merged[i].section,
-              startChar: merged[i].startChar,
-              endChar: merged[i].endChar,
-              text: merged[i].text,
-            ),
-        ];
-        debugPrint(
-          '[import] $documentId: OCR gave ${ocrChunks.length} chunks from '
-          '${ocrPageSet.length}/${ocrPages.length} pages; '
-          'total chunks=${chunksToIndex.length}',
-        );
-
-        if (chunksToIndex.isEmpty) {
-          throw StateError(
-            'OCR ran on ${ocrPages.length}/$totalPages pages but found no text '
-            '(pdfType: ${extractResult.pdfType}). The pages may be blank.',
-          );
-        }
-      } else if (!hasText) {
-        // No text and nothing flagged for OCR: unreadable or broken PDF.
-        throw StateError(
-          'Could not read any content from PDF '
-          '(pdfType: ${extractResult.pdfType}, pages: $totalPages, '
-          'empty pages: ${extractResult.emptyPages.length}). '
-          'The file may be corrupted or unsupported.',
-        );
-      }
-
-      // 5. Reserve monotonic vector IDs from collection
+      // 6. Reserve monotonic vector IDs from collection
       final collection = await storage.loadCollection(collectionId);
       if (collection == null) {
         throw StateError('Collection $collectionId not found');
       }
 
-      int currentVectorId = collection.nextVectorId;
-      final List<PaperChunk> assignedChunks = [];
-      for (final chunk in chunksToIndex) {
-        assignedChunks.add(
-          PaperChunk(
-            id: chunk.id,
+      var currentVectorId = collection.nextVectorId;
+      final assignedChunks = [
+        for (final chunk in [...indexed.chunks, ...figureChunks])
+          chunk.copyWith(
             vectorId: currentVectorId++,
-            page: chunk.page,
-            ordinal: chunk.ordinal,
-            section: chunk.section,
-            startChar: chunk.startChar,
-            endChar: chunk.endChar,
-            text: chunk.text,
             documentId: documentId,
-            documentTitle: extractResult.title,
+            documentTitle: indexed.title,
             documentFileName: originalFileName,
           ),
-        );
-      }
+      ];
 
-      // Update collection nextVectorId
       await storage.saveCollection(
         collection.copyWith(nextVectorId: currentVectorId),
       );
 
-      // Save assigned chunks in metadata before vector insert
+      // Save the structure before the vector insert, so a failure past this
+      // point still leaves the sections and references on disk.
       paperDoc = paperDoc.copyWith(
-        title: extractResult.title,
-        pageCount: extractResult.pageCount,
+        title: indexed.title,
+        authors: indexed.authors,
+        pageCount: indexed.pageCount,
+        sections: indexed.sections,
         chunks: assignedChunks,
-        references: documentReferences,
+        references: indexed.references,
       );
       await storage.savePaper(collectionId, paperDoc);
 
-      // 6. Generate embeddings
+      // 7. Generate embeddings. Figure chunks embed jointly over their image
+      // and caption; text chunks are unchanged.
       onProgress?.call(
-        'Generating embeddings (${assignedChunks.length} chunks)...',
-        0.5,
+        'Generating embeddings (${assignedChunks.length} chunks, '
+        '${figureChunks.length} figures)...',
+        0.75,
       );
-      final chunkTexts = assignedChunks.map((c) => c.text).toList();
-      final vectors = await embeddings.embedTexts(chunkTexts);
+      final inputs = <EmbeddingInput>[];
+      for (final chunk in assignedChunks) {
+        final path = chunk.imagePath;
+        if (path == null) {
+          inputs.add(EmbeddingInput.text(chunk.embeddingText));
+          continue;
+        }
+        final file = File(storage.figurePath(collectionId, documentId, path));
+        if (!file.existsSync()) {
+          // The image went missing between saving and embedding; the caption
+          // alone still makes the figure findable.
+          inputs.add(EmbeddingInput.text(chunk.embeddingText));
+          continue;
+        }
+        inputs.add(
+          EmbeddingInput.image(
+            text: chunk.embeddingText,
+            bytes: await file.readAsBytes(),
+            mediaType: chunk.imageMediaType ?? 'image/png',
+          ),
+        );
+      }
+      final vectors = await embeddings.embedInputs(inputs);
 
       if (vectors.length != assignedChunks.length) {
         throw StateError(
-          'Embedding count mismatch: expected ${assignedChunks.length}, got ${vectors.length}',
+          'Embedding count mismatch: expected ${assignedChunks.length}, '
+          'got ${vectors.length}',
         );
       }
 
-      // 7. Save index state as dirty before native mutation
-      onProgress?.call('Indexing vectors...', 0.8);
+      // 8. Save index state as dirty before native mutation
+      onProgress?.call('Indexing vectors...', 0.9);
       final indexFilePath = storage.indexVectorsPath(collectionId);
       if (!index.isOpen) {
         await index.openOrCreate(indexFilePath);
@@ -321,11 +279,11 @@ class PaperRepository {
         ),
       );
 
-      // 8. Insert vectors into TurboVEC index and save
+      // 9. Insert vectors into TurboVEC index and save
       await index.add(assignedChunks, vectors);
       await index.save(indexFilePath);
 
-      // 9. Mark paper as ready, index state as clean
+      // 10. Mark paper as ready, index state as clean
       paperDoc = paperDoc.copyWith(status: DocumentStatus.ready);
       await storage.savePaper(collectionId, paperDoc);
 
@@ -353,179 +311,50 @@ class PaperRepository {
     }
   }
 
-  static const _maxConcurrentOcr = 3;
-
-  /// Same pattern as `section_regex` in rust/src/api/pdf_parser.rs, so OCR
-  /// chunks get the same section names as text chunks when used as a fallback.
-  static final _sectionRegex = RegExp(
-    r'^(?:\d+(?:\.\d+)*\s+)?(Abstract|Introduction|Background|Related\s+Work|Methodology|Method|Architecture|Implementation|Evaluation|Experiments?|Results?|Discussion|Conclusion|References)\b',
-    caseSensitive: false,
-  );
-
-  /// Renders and OCRs [pages], assembles the full Markdown document across all pages,
-  /// queries an OpenRouter instruct model for section and reference parsing,
-  /// and chunks the text with accurate section labels.
-  /// Throws immediately if OCR or OpenRouter instruct parsing fails.
-  Future<OcrProcessResult> _ocrPages({
-    required String pdfPath,
+  /// Writes each figure next to its document and returns the chunks that
+  /// point at them.
+  ///
+  /// The chunk stores only the file name; the collection and document are
+  /// already known wherever it is read, and keeping the path relative means a
+  /// moved data directory does not strand every figure.
+  Future<List<PaperChunk>> _saveFigures({
+    required String collectionId,
     required String documentId,
-    required List<int> pages,
-    required int totalPages,
-    required List<PaperChunk> textChunks,
-    ImportProgressCallback? onProgress,
+    required List<IndexedFigure> figures,
   }) async {
-    final settings = await storage.loadSettings();
-    if (settings.openRouterApiKey.trim().isEmpty) {
-      throw StateError('OpenRouter API key is required for OCR.');
-    }
-    final modelId = settings.chatModel;
-    const renderer = PageRenderService();
-    // One document shared by all workers; closed after every worker is done.
-    final document = await renderer.openDocument(pdfPath);
-    final ocr = VisionOcrService(settings: settings);
+    if (figures.isEmpty) return const [];
 
-    final queue = pages.toSet().toList()..sort();
-    final texts = <int, String>{};
-    var next = 0;
-    var done = 0;
-    Object? failure;
-    StackTrace? failureStack;
-
-    Future<void> worker() async {
-      while (failure == null && next < queue.length) {
-        final page = queue[next++];
-        try {
-          final png = await renderer.renderDocumentPage(document, page);
-          texts[page] = await ocr.ocrPage(png, modelId: modelId);
-          done++;
-          onProgress?.call(
-            'OCR $done/${queue.length} pages ($modelId)...',
-            0.3 + 0.2 * done / queue.length,
-          );
-        } catch (e, stack) {
-          failure ??= StateError('OCR failed on page $page: $e');
-          failureStack ??= stack;
-        }
-      }
-    }
-
-    try {
-      await Future.wait([
-        for (var i = 0; i < min(_maxConcurrentOcr, queue.length); i++)
-          worker(),
-      ]);
-    } finally {
-      ocr.close();
-      await document.dispose();
-    }
-    if (failure != null) {
-      Error.throwWithStackTrace(failure!, failureStack ?? StackTrace.current);
-    }
-
-    // Assemble per-page text for all pages in the PDF.
-    // For OCR pages, use the transcribed markdown from texts[p].
-    // For native text pages, rebuild text from textChunks.
-    final allPageTexts = <int, String>{};
-    final chunksByPage = <int, List<PaperChunk>>{};
-    for (final chunk in textChunks) {
-      chunksByPage.putIfAbsent(chunk.page, () => []).add(chunk);
-    }
-
-    for (var page = 1; page <= totalPages; page++) {
-      if (texts.containsKey(page)) {
-        allPageTexts[page] = texts[page]!;
-      } else if (chunksByPage.containsKey(page)) {
-        allPageTexts[page] = ReferenceParser.rebuildText(chunksByPage[page]!);
-      }
-    }
-
-    final assembledMarkdown = InstructDocumentService.assembleMarkdown(
-      allPageTexts,
-      totalPages,
-    );
-
-    onProgress?.call(
-      'Parsing sections and references with instruct model ($modelId)...',
-      0.55,
-    );
-
-    // Call OpenRouter instruct model. DO NOT catch to fallback - fail immediately on error.
-    final instructService = InstructDocumentService(settings: settings);
-    final ParsedStructureResult structureResult;
-    try {
-      structureResult = await instructService.parseStructure(
-        assembledMarkdown,
-        modelId: modelId,
-      );
-    } finally {
-      instructService.close();
-    }
-
-    final sortedSections = structureResult.sections.toList()
-      ..sort((a, b) => a.page.compareTo(b.page));
+    final dir = Directory(storage.figuresDir(collectionId, documentId));
+    await dir.create(recursive: true);
 
     final chunks = <PaperChunk>[];
-    for (final page in queue) {
-      final text = texts[page]?.trim() ?? '';
-      if (text.isEmpty) {
-        debugPrint('[import] $documentId: OCR page $page is blank');
-        continue;
-      }
+    for (var i = 0; i < figures.length; i++) {
+      final figure = figures[i];
+      final name = 'fig_${i.toString().padLeft(3, '0')}.${figure.extension}';
+      await File(p.join(dir.path, name)).writeAsBytes(figure.bytes);
 
-      // Determine active section for this page from the instruct model's detected sections
-      var currentSection = 'Introduction';
-      final matching = sortedSections.where((s) => s.page <= page).toList();
-      if (matching.isNotEmpty) {
-        currentSection = matching.last.name;
-      }
-
-      // Check if page contains regex section headings as an additional signal
-      for (final line in text.split('\n')) {
-        final trimmed = line.trim().replaceFirst(RegExp(r'^#+'), '').trim();
-        final match = _sectionRegex.firstMatch(trimmed);
-        if (match != null) {
-          currentSection = match.group(0)!;
-          break;
-        }
-      }
-
-      final pageChunks = await rust_pdf.chunkText(
-        pageText: text,
-        pageNum: page,
-        documentId: documentId,
-        section: currentSection,
-        startOrdinal: 0,
+      chunks.add(
+        PaperChunk(
+          id: '$documentId:figure:$i',
+          vectorId: 0,
+          page: figure.page,
+          ordinal: i,
+          section: figure.section,
+          // A figure occupies no span of the transcript; an empty span keeps
+          // it out of any offset-based lookup rather than pointing at text it
+          // did not come from.
+          startChar: 0,
+          endChar: 0,
+          text: figure.embeddingText,
+          imagePath: name,
+          imageMediaType: figure.mediaType,
+        ),
       );
-
-      final sectionsOnThisPage =
-          sortedSections.where((s) => s.page == page).toList();
-      for (final rc in pageChunks) {
-        var chunkSection = rc.section;
-        for (final sec in sectionsOnThisPage) {
-          if ((sec.rawHeading != null && rc.text.contains(sec.rawHeading!)) ||
-              rc.text.toLowerCase().contains(sec.name.toLowerCase())) {
-            chunkSection = sec.name;
-          }
-        }
-
-        chunks.add(
-          PaperChunk(
-            id: '$documentId:p${rc.page}:ocr${rc.ordinal}',
-            vectorId: 0,
-            page: rc.page,
-            ordinal: rc.ordinal,
-            section: chunkSection,
-            startChar: rc.startChar,
-            endChar: rc.endChar,
-            text: rc.text,
-          ),
-        );
-      }
     }
 
-    return OcrProcessResult(
-      chunks: chunks,
-      references: structureResult.references,
+    debugPrint(
+      '[figures] $documentId: saved ${chunks.length} figures to ${dir.path}',
     );
+    return chunks;
   }
 }

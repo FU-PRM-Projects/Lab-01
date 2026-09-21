@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lab_05/data/models/paper.dart';
-import 'package:lab_05/domain/reference_parser.dart';
+import 'package:lab_05/data/models/reference.dart';
 
 void main() {
   group('PaperDocument references serialization', () {
@@ -74,12 +74,7 @@ void main() {
       expect(doc.references, isEmpty);
 
       final updated = doc.copyWith(
-        references: const [
-          PaperReference(
-            index: 1,
-            raw: 'Citation',
-          ),
-        ],
+        references: const [PaperReference(index: 1, raw: 'Citation')],
       );
 
       expect(updated.references, hasLength(1));

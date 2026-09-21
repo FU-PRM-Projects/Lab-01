@@ -6,7 +6,7 @@
 // Static analysis wrongly picks the IO variant, thus ignore this
 // ignore_for_file: argument_type_not_assignable
 
-import 'api/pdf_parser.dart';
+import 'api/pdf_images.dart';
 import 'api/vector_index.dart';
 
 import 'dart:async';
@@ -41,9 +41,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  int dco_decode_CastedPrimitive_i_64(dynamic raw);
-
-  @protected
   int dco_decode_CastedPrimitive_u_64(dynamic raw);
 
   @protected
@@ -62,16 +59,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  ExtractedImage dco_decode_extracted_image(dynamic raw);
+
+  @protected
   double dco_decode_f_32(dynamic raw);
 
   @protected
-  int dco_decode_i_32(dynamic raw);
-
-  @protected
-  PlatformInt64 dco_decode_i_64(dynamic raw);
-
-  @protected
   List<int> dco_decode_list_CastedPrimitive_u_64(dynamic raw);
+
+  @protected
+  List<ExtractedImage> dco_decode_list_extracted_image(dynamic raw);
 
   @protected
   List<double> dco_decode_list_prim_f_32_loose(dynamic raw);
@@ -80,31 +77,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Float32List dco_decode_list_prim_f_32_strict(dynamic raw);
 
   @protected
-  Int32List dco_decode_list_prim_i_32_strict(dynamic raw);
-
-  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
-
-  @protected
-  List<RustPaperChunk> dco_decode_list_rust_paper_chunk(dynamic raw);
 
   @protected
   List<RustSearchResult> dco_decode_list_rust_search_result(dynamic raw);
 
   @protected
-  String? dco_decode_opt_String(dynamic raw);
-
-  @protected
   List<int>? dco_decode_opt_list_CastedPrimitive_u_64(dynamic raw);
 
   @protected
-  RustPaperChunk dco_decode_rust_paper_chunk(dynamic raw);
-
-  @protected
-  RustPdfProcessedResult dco_decode_rust_pdf_processed_result(dynamic raw);
-
-  @protected
   RustSearchResult dco_decode_rust_search_result(dynamic raw);
+
+  @protected
+  StrippedPdf dco_decode_stripped_pdf(dynamic raw);
+
+  @protected
+  int dco_decode_u_32(dynamic raw);
 
   @protected
   BigInt dco_decode_u_64(dynamic raw);
@@ -131,9 +119,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  int sse_decode_CastedPrimitive_i_64(SseDeserializer deserializer);
-
-  @protected
   int sse_decode_CastedPrimitive_u_64(SseDeserializer deserializer);
 
   @protected
@@ -152,16 +137,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  ExtractedImage sse_decode_extracted_image(SseDeserializer deserializer);
+
+  @protected
   double sse_decode_f_32(SseDeserializer deserializer);
 
   @protected
-  int sse_decode_i_32(SseDeserializer deserializer);
-
-  @protected
-  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
-
-  @protected
   List<int> sse_decode_list_CastedPrimitive_u_64(SseDeserializer deserializer);
+
+  @protected
+  List<ExtractedImage> sse_decode_list_extracted_image(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<double> sse_decode_list_prim_f_32_loose(SseDeserializer deserializer);
@@ -170,15 +157,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Float32List sse_decode_list_prim_f_32_strict(SseDeserializer deserializer);
 
   @protected
-  Int32List sse_decode_list_prim_i_32_strict(SseDeserializer deserializer);
-
-  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
-
-  @protected
-  List<RustPaperChunk> sse_decode_list_rust_paper_chunk(
-    SseDeserializer deserializer,
-  );
 
   @protected
   List<RustSearchResult> sse_decode_list_rust_search_result(
@@ -186,23 +165,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  String? sse_decode_opt_String(SseDeserializer deserializer);
-
-  @protected
   List<int>? sse_decode_opt_list_CastedPrimitive_u_64(
     SseDeserializer deserializer,
   );
 
   @protected
-  RustPaperChunk sse_decode_rust_paper_chunk(SseDeserializer deserializer);
-
-  @protected
-  RustPdfProcessedResult sse_decode_rust_pdf_processed_result(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   RustSearchResult sse_decode_rust_search_result(SseDeserializer deserializer);
+
+  @protected
+  StrippedPdf sse_decode_stripped_pdf(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
 
   @protected
   BigInt sse_decode_u_64(SseDeserializer deserializer);
@@ -217,6 +191,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt sse_decode_usize(SseDeserializer deserializer);
 
   @protected
+  int sse_decode_i_32(SseDeserializer deserializer);
+
+  @protected
   void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
     NativeVectorIndex self,
@@ -229,9 +206,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     NativeVectorIndex self,
     SseSerializer serializer,
   );
-
-  @protected
-  void sse_encode_CastedPrimitive_i_64(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_CastedPrimitive_u_64(int self, SseSerializer serializer);
@@ -253,17 +227,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_extracted_image(
+    ExtractedImage self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_f_32(double self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_i_32(int self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_CastedPrimitive_u_64(
     List<int> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_extracted_image(
+    List<ExtractedImage> self,
     SseSerializer serializer,
   );
 
@@ -280,20 +260,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_list_prim_i_32_strict(
-    Int32List self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_list_rust_paper_chunk(
-    List<RustPaperChunk> self,
     SseSerializer serializer,
   );
 
@@ -304,23 +272,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_opt_String(String? self, SseSerializer serializer);
-
-  @protected
   void sse_encode_opt_list_CastedPrimitive_u_64(
     List<int>? self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_rust_paper_chunk(
-    RustPaperChunk self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_rust_pdf_processed_result(
-    RustPdfProcessedResult self,
     SseSerializer serializer,
   );
 
@@ -329,6 +282,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     RustSearchResult self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_stripped_pdf(StrippedPdf self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_64(BigInt self, SseSerializer serializer);
@@ -341,6 +300,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_usize(BigInt self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_i_32(int self, SseSerializer serializer);
 }
 
 // Section: wire_class

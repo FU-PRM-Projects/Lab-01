@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import 'package:lab_05/data/models/app_settings.dart';
@@ -76,8 +77,9 @@ class DataDirectoryController {
   }
 }
 
-final dataDirectoryControllerProvider =
-    Provider<DataDirectoryController>((ref) => DataDirectoryController(ref));
+final dataDirectoryControllerProvider = Provider<DataDirectoryController>(
+  (ref) => DataDirectoryController(ref),
+);
 
 // Settings Provider
 class SettingsNotifier extends StateNotifier<AppSettings> {
@@ -176,8 +178,11 @@ class PapersNotifier extends StateNotifier<List<PaperDocument>> {
   final LocalStorage _storage;
   final String? _collectionId;
 
-  PapersNotifier(this._storage, this._collectionId, [List<PaperDocument> initial = const []])
-      : super(initial) {
+  PapersNotifier(
+    this._storage,
+    this._collectionId, [
+    List<PaperDocument> initial = const [],
+  ]) : super(initial) {
     refresh();
   }
 
@@ -227,15 +232,16 @@ final papersProvider = Provider<List<PaperDocument>>((ref) {
   return ref.watch(projectPapersProvider(currentCol.id));
 });
 
-
-
 // Chats Notifier for current collection
 class ChatsNotifier extends StateNotifier<List<Chat>> {
   final LocalStorage _storage;
   final String? _collectionId;
 
-  ChatsNotifier(this._storage, this._collectionId, [List<Chat> initial = const []])
-      : super(initial) {
+  ChatsNotifier(
+    this._storage,
+    this._collectionId, [
+    List<Chat> initial = const [],
+  ]) : super(initial) {
     refresh();
   }
 
@@ -285,7 +291,6 @@ final chatsProvider = Provider<List<Chat>>((ref) {
   if (currentCol == null) return const [];
   return ref.watch(projectChatsProvider(currentCol.id));
 });
-
 
 // Current Active Chat Provider
 final currentChatProvider = StateProvider<Chat?>((ref) => null);
