@@ -49,8 +49,18 @@ class GeminiFunctionDeclaration {
   Map<String, dynamic> toJson() => {
     'name': name,
     'description': description,
-    'parameters': _upperCaseSchemaTypes(parametersJsonSchema),
+    // Gemini's v1beta endpoint rejects an explicit empty-object schema
+    // (`{"type":"OBJECT","properties":{}}`) with a 400 INVALID_ARGUMENT for
+    // parameterless tools like `list_papers`; it only accepts them when
+    // `parameters` is omitted entirely.
+    if (!_isEmptySchema(parametersJsonSchema))
+      'parameters': _upperCaseSchemaTypes(parametersJsonSchema),
   };
+
+  static bool _isEmptySchema(Map<String, dynamic> schema) {
+    final properties = schema['properties'];
+    return properties == null || (properties is Map && properties.isEmpty);
+  }
 
   /// Gemini's function-calling schema expects OpenAPI-style type casing
   /// ("OBJECT", "STRING", "INTEGER"...) while the tool specs elsewhere in

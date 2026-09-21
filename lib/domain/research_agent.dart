@@ -330,7 +330,11 @@ $initialEvidence
           ),
         );
       }
-      contents.add(GeminiContent(role: 'function', parts: responseParts));
+      // Gemini's v1beta `contents` contract only permits 'user' or 'model'
+      // roles — there is no 'function' role. Function-result parts are
+      // sent back wrapped in a 'user' turn, exactly like the initial
+      // question.
+      contents.add(GeminiContent(role: 'user', parts: responseParts));
     }
   }
 

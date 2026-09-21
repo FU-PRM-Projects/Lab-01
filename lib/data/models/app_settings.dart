@@ -75,11 +75,18 @@ class AppSettings {
     );
   }
 
+  /// Only 'openrouter' and 'gemini' are valid — those are the only two
+  /// segments [SettingsDialog]'s `SegmentedButton` offers. Anything else
+  /// (missing field, typo, future value from a newer app version) falls
+  /// back to [defaultProvider] so the dialog always has a selection.
+  static String _normalizeProvider(String? value) =>
+      value == 'gemini' ? 'gemini' : defaultProvider;
+
   factory AppSettings.fromJson(Map<String, dynamic> json) {
     return AppSettings(
       schemaVersion: json['schemaVersion'] as int? ?? 1,
       theme: json['theme'] as String? ?? 'dark',
-      provider: json['provider'] as String? ?? defaultProvider,
+      provider: _normalizeProvider(json['provider'] as String?),
       chatModel: json['chatModel'] as String? ?? defaultChatModel,
       defaultEmbeddingModel:
           json['defaultEmbeddingModel'] as String? ??
