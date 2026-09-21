@@ -1,6 +1,6 @@
 # PaperChat
 
-A Windows Flutter app for local research-paper collections, streamed AI chat, and saved citations. PDF extraction and exact vector search run in Rust; OpenRouter handles embeddings and chat generation.
+A Windows Flutter app for local research-paper collections, streamed AI chat, and saved citations. PDF extraction and quantized vector search run in Rust; OpenRouter handles embeddings and chat generation.
 
 ## Project layout
 
@@ -26,12 +26,11 @@ packages/paper_native/       # Rust crate, bridge code, and Windows build suppor
   cargokit/                 # Vendored upstream build tooling
   windows/                  # Native build/bundling configuration
 test/                       # Models, services, controllers, and widget tests
-docs/archive/               # Original implementation proposal
 ```
 
 Views render state and handle UI actions; controllers coordinate operations. `PaperRepository` owns the native index for one collection and orchestrates import using concrete services. Riverpod supplies dependencies without another DI framework. Models use simple JSON codecs; generated bridge code stays in the native package.
 
-`ResearchAgent` uses the existing LangChain packages for typed messages, streamed response parsing, and tool-call concatenation. It allows four model requests and four tool executions per turn, including initial retrieval. `http` supplies embedding retries; Rust `itertools` supplies top-k selection.
+`ResearchAgent` uses the existing LangChain packages for typed messages, streamed response parsing, and tool-call concatenation. It allows four model requests and four tool executions per turn, including initial retrieval. `http` supplies embedding retries; the Rust `turbovec` crate supplies top-k selection.
 
 ## Build and run
 
@@ -63,6 +62,11 @@ To regenerate bindings after Rust API changes, see [the native package instructi
 
 The application-support `PaperChat/` directory and JSON formats are unchanged. An old `.key_store` file is imported into settings once and then removed; saving an empty key keeps it cleared. Credentials retain the existing settings-file storage behavior.
 
-The index is an **exact cosine-search implementation**, not the upstream TurboVEC engine. Its `TVEC` version-1 file layout and legacy bit-width field remain compatible; the bit-width field does not enable quantization. Invalid indexes fail visibly instead of silently resetting. Scanned PDFs still require OCR, which is not implemented.
+The index is the upstream **[`turbovec`](https://crates.io/crates/turbovec) engine**, wrapped by `NativeVectorIndex`. It uses `IdMapIndex`, which keeps the existing `u64` chunk vector IDs across adds, removals and reloads, and stores its own `.tvim` files at the unchanged `vectors.tvim` path.
 
-The [original proposal](docs/archive/IMPLEMENTATION_PLAN.md) is archived historical context. This README describes the current code.
+Two constraints follow from the engine:
+
+- **Embedding dimensions must be a positive multiple of 8.** The default 768 qualifies, as do the common 1536 and 3072. A `defaultEmbeddingDimensions` that does not is rejected when the index is created.
+- **`bitWidth` must be 2, 3, or 4** and now genuinely selects quantization. The default remains 4. Search is approximate rather than exact: vectors are compressed to 4 bits per coordinate, which is what makes it fast and small, but a top-k result set is no longer guaranteed identical to a full cosine scan.
+
+Index files written before this engine, which used the `TVEC` version-1 layout, are not readable and must be rebuilt by reimporting the collection. Invalid indexes fail visibly instead of silently resetting. Scanned PDFs still require OCR, which is not implemented.

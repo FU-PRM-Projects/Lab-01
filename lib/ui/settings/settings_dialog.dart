@@ -1,9 +1,13 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/app_settings.dart';
+import 'package:lab_05/data/services/local_storage.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
 class SettingsDialog extends ConsumerStatefulWidget {
@@ -18,6 +22,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
   late TextEditingController _apiKeyController;
   late String _selectedModel;
   late String _selectedTheme;
+  String? _defaultDirPath;
   bool _obscureKey = true;
 
   static const List<Map<String, String>> _availableChatModels = [
@@ -44,6 +49,18 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
     _selectedModel = modelIds.contains(settings.chatModel)
         ? settings.chatModel
         : modelIds.first;
+    _checkDefaultDir();
+  }
+
+  Future<void> _checkDefaultDir() async {
+    try {
+      final defaultDir = await LocalStorage.getDefaultDataDirectory();
+      if (mounted) {
+        setState(() {
+          _defaultDirPath = defaultDir.path;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -223,7 +240,8 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                 obscureText: _obscureKey,
                 decoration: InputDecoration(
                   hintText: 'sk-or-v1-...',
-                  helperText: 'Saved securely locally in settings.json. Never uploaded.',
+                  helperText:
+                      'Saved securely locally in settings.json. Never uploaded.',
                   helperStyle: textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                     fontSize: 11,
@@ -332,12 +350,56 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
               const SizedBox(height: 18),
 
               // Local Storage Root Path
-              Text(
-                'Local Data Directory',
-                style: textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
-                ),
+              Row(
+                children: [
+                  Text(
+                    'Local Data Directory',
+                    style: textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_defaultDirPath != null &&
+                      p.normalize(storage.rootDir.path) !=
+                          p.normalize(_defaultDirPath!))
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      icon: const Icon(Icons.restore_outlined, size: 14),
+                      label: const Text(
+                        'Reset to Default',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      onPressed: () async {
+                        try {
+                          await ref
+                              .read(dataDirectoryControllerProvider)
+                              .resetToDefault();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Reset to default data directory'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to reset directory: $e'),
+                                backgroundColor: colorScheme.error,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                ],
               ),
               const SizedBox(height: 6),
               Container(
@@ -364,6 +426,51 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                     ),
                     IconButton(
                       icon: Icon(
+                        Icons.folder_open_outlined,
+                        size: 18,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      tooltip: 'Change directory',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () async {
+                        final selectedPath =
+                            await FilePicker.getDirectoryPath(
+                          dialogTitle: 'Select Local Data Directory',
+                          initialDirectory: storage.rootDir.path,
+                        );
+                        if (selectedPath != null && selectedPath.isNotEmpty) {
+                          try {
+                            await ref
+                                .read(dataDirectoryControllerProvider)
+                                .changeDirectory(Directory(selectedPath));
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Data directory updated: $selectedPath',
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Failed to change directory: $e',
+                                  ),
+                                  backgroundColor: colorScheme.error,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(
                         Icons.copy_outlined,
                         size: 16,
                         color: colorScheme.onSurfaceVariant,
@@ -387,6 +494,14 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                       },
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Collections, documents, and chat histories will be stored in this directory.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 11,
                 ),
               ),
 

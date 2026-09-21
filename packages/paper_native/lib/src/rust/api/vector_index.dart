@@ -8,7 +8,6 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `norm`, `validate_vector`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `IndexInner`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `eq`, `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NativeVectorIndex>>
@@ -27,6 +26,7 @@ abstract class NativeVectorIndex implements RustOpaqueInterface {
       RustLib.instance.api.crateApiVectorIndexNativeVectorIndexLoad(path: path);
 
   // HINT: Make it `#[frb(sync)]` to let it become the default constructor of Dart class.
+  /// A `dim` of zero defers the dimension until the first `add_batch`.
   static Future<NativeVectorIndex> newInstance({
     required int dim,
     required int bitWidth,

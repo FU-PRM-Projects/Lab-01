@@ -61,9 +61,6 @@ pub fn parse_pdf(
         pages_extraction.pages.len() as i32
     };
 
-    let section_regex = Regex::new(
-        r"(?i)^(?:\d+(?:\.\d+)*\s+)?(Abstract|Introduction|Background|Related\s+Work|Methodology|Method|Architecture|Implementation|Evaluation|Experiments?|Results?|Discussion|Conclusion|References)\b",
-    ).map_err(|e| e.to_string())?;
 
     let mut detected_title = fallback_title.clone().unwrap_or_else(|| {
         path.file_name()
@@ -104,22 +101,31 @@ pub fn parse_pdf(
             }
         }
 
-        // Section header scanning
-        for line in page_text.lines() {
-            let trimmed = line.trim().trim_start_matches('#').trim();
-            if let Some(mat) = section_regex.find(trimmed) {
-                current_section = mat.as_str().to_string();
-                break;
-            }
-        }
+        // Section headers can appear anywhere on the page, so collect every one
+        // with its character offset instead of labelling the whole page at once.
+        let boundaries = detect_section_boundaries(page_text);
 
-        let page_chunks = chunk_text(
+        let mut page_chunks = chunk_text(
             page_text,
             page_num,
             &document_id,
             &current_section,
             ordinal,
         );
+
+        for chunk in &mut page_chunks {
+            if let Some((_, name)) = boundaries
+                .iter()
+                .rev()
+                .find(|(offset, _)| *offset <= chunk.start_char as usize)
+            {
+                chunk.section = name.clone();
+            }
+        }
+
+        if let Some((_, name)) = boundaries.last() {
+            current_section = name.clone();
+        }
 
         ordinal += page_chunks.len() as i32;
         all_chunks.extend(page_chunks);
@@ -133,6 +139,88 @@ pub fn parse_pdf(
         pdf_type: pdf_type_str,
         needs_ocr_pages,
     })
+}
+
+/// Strips the markdown/HTML decoration pdf extraction wraps headings in
+/// (`## Abstract`, `**3 Methodology**`, `<u>References</u>`) so the bare
+/// heading text is left for matching.
+fn normalize_heading_line(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut in_tag = false;
+    for ch in line.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' if in_tag => in_tag = false,
+            _ if in_tag => {}
+            '#' | '*' | '_' | '`' | '~' | '|' => {}
+            _ => out.push(ch),
+        }
+    }
+    out.trim()
+        .trim_matches(|c: char| c == ':' || c == '.' || c == '-' || c == '\u{2022}')
+        .trim()
+        .to_string()
+}
+
+/// Returns `(char offset, section name)` for every heading line on the page.
+///
+/// The pattern is anchored at both ends so only lines that consist solely of a
+/// heading count — body prose such as "Results show that ..." or "References to
+/// prior work ..." no longer flips the current section.
+fn detect_section_boundaries(page_text: &str) -> Vec<(usize, String)> {
+    let heading_regex = Regex::new(
+        r"(?i)^(?:\d+(?:\.\d+)*\.?\s+)?(Abstract|Introduction|Background|Related\s+Work|Preliminaries|Methodology|Methods?|Approach|Architecture|Implementation|Evaluation|Experiments?|Results?|Analysis|Discussion|Limitations|Conclusions?|Future\s+Work|Acknowledgements?|Acknowledgments?|References|Bibliography|Appendix)\s*$",
+    )
+    .expect("valid section heading regex");
+
+    let mut boundaries: Vec<(usize, String)> = Vec::new();
+    let mut offset = 0usize;
+
+    for line in page_text.split_inclusive('\n') {
+        let normalized = normalize_heading_line(line);
+        if let Some(caps) = heading_regex.captures(&normalized) {
+            let name = canonical_section_name(caps.get(1).map_or("", |m| m.as_str()));
+            // Running headers repeat the same title on every page; only record
+            // real transitions so a repeated heading cannot re-open a section.
+            if boundaries.last().is_none_or(|(_, prev)| *prev != name) {
+                boundaries.push((offset, name));
+            }
+        }
+        offset += line.chars().count();
+    }
+
+    boundaries
+}
+
+/// Normalizes casing and plural variants so chunks group under one label.
+fn canonical_section_name(raw: &str) -> String {
+    let collapsed = raw
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase();
+
+    match collapsed.as_str() {
+        "method" | "methods" | "methodology" => "Methodology".to_string(),
+        "experiment" | "experiments" => "Experiments".to_string(),
+        "result" | "results" => "Results".to_string(),
+        "conclusion" | "conclusions" => "Conclusion".to_string(),
+        "acknowledgement" | "acknowledgements" | "acknowledgment" | "acknowledgments" => {
+            "Acknowledgments".to_string()
+        }
+        "bibliography" => "References".to_string(),
+        _ => collapsed
+            .split(' ')
+            .map(|w| {
+                let mut chars = w.chars();
+                match chars.next() {
+                    Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                    None => String::new(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" "),
+    }
 }
 
 pub fn chunk_text(
@@ -281,5 +369,49 @@ mod tests {
         assert_eq!(chunks[1].ordinal, 6);
         assert_eq!(chunks[0].section, "Methodology");
         assert_eq!(chunks[1].section, "Methodology");
+    }
+
+    #[test]
+    fn test_detects_headings_wrapped_in_markdown_decoration() {
+        let page = "## Abstract
+We present a method.
+
+**1 Introduction**
+Prior work is vast.
+
+<u>2 Related Work</u>
+Others did things.
+";
+        let sections: Vec<String> = detect_section_boundaries(page)
+            .into_iter()
+            .map(|(_, name)| name)
+            .collect();
+        assert_eq!(sections, vec!["Abstract", "Introduction", "Related Work"]);
+    }
+
+    #[test]
+    fn test_body_prose_is_not_treated_as_a_heading() {
+        let page = "Results show that the model improves.
+References to prior work are numerous.
+Methodology of others differs.
+";
+        assert!(detect_section_boundaries(page).is_empty());
+    }
+
+    #[test]
+    fn test_repeated_running_header_does_not_reopen_section() {
+        let page = "## References
+[1] A paper.
+## References
+[2] Another paper.
+";
+        assert_eq!(detect_section_boundaries(page).len(), 1);
+    }
+
+    #[test]
+    fn test_headings_are_canonicalized() {
+        assert_eq!(canonical_section_name("METHODS"), "Methodology");
+        assert_eq!(canonical_section_name("Bibliography"), "References");
+        assert_eq!(canonical_section_name("related   work"), "Related Work");
     }
 }

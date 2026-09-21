@@ -264,11 +264,9 @@ fn wire__crate__api__vector_index__NativeVectorIndex_new_impl(
             let api_bit_width = <usize>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Ok::<_, ()>(crate::api::vector_index::NativeVectorIndex::new(
-                        api_dim,
-                        api_bit_width,
-                    ))?;
+                transform_result_sse::<_, String>((move || {
+                    let output_ok =
+                        crate::api::vector_index::NativeVectorIndex::new(api_dim, api_bit_width)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }

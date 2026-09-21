@@ -1,13 +1,6 @@
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write};
-use std::path::Path;
+use std::collections::HashSet;
 use std::sync::RwLock;
-
-const MAGIC: &[u8; 4] = b"TVEC";
-const CURRENT_VERSION: u32 = 1;
+use turbovec::IdMapIndex;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RustSearchResult {
@@ -15,147 +8,53 @@ pub struct RustSearchResult {
     pub score: f32,
 }
 
-struct IndexInner {
-    dim: usize,
-    bit_width: usize,
-    vectors: HashMap<u64, Vec<f32>>,
-}
-
 pub struct NativeVectorIndex {
-    inner: RwLock<IndexInner>,
+    inner: RwLock<IdMapIndex>,
 }
 
 impl NativeVectorIndex {
-    pub fn new(dim: usize, bit_width: usize) -> Self {
-        Self {
-            inner: RwLock::new(IndexInner {
-                dim,
-                bit_width,
-                vectors: HashMap::new(),
-            }),
+    /// A `dim` of zero defers the dimension until the first `add_batch`.
+    pub fn new(dim: usize, bit_width: usize) -> Result<Self, String> {
+        let index = if dim == 0 {
+            IdMapIndex::new_lazy(bit_width)
+        } else {
+            IdMapIndex::new(dim, bit_width)
         }
+        .map_err(|e| format!("Failed to construct vector index: {e}"))?;
+
+        Ok(Self {
+            inner: RwLock::new(index),
+        })
     }
 
     pub fn load(path: String) -> Result<Self, String> {
-        let file = File::open(Path::new(&path))
-            .map_err(|e| format!("Failed to open index file at {path}: {e}"))?;
-        let mut reader = BufReader::new(file);
-
-        let mut magic = [0u8; 4];
-        reader
-            .read_exact(&mut magic)
-            .map_err(|e| format!("Failed to read magic: {e}"))?;
-        if &magic != MAGIC {
-            return Err(format!(
-                "Invalid TVEC magic bytes: {:?}",
-                String::from_utf8_lossy(&magic)
-            ));
-        }
-
-        let version = reader
-            .read_u32::<LittleEndian>()
-            .map_err(|e| format!("Failed to read version: {e}"))?;
-        if version != CURRENT_VERSION {
-            return Err(format!("Unsupported TVEC version: {version}"));
-        }
-
-        let dim = reader
-            .read_u64::<LittleEndian>()
-            .map_err(|e| format!("Failed to read dim: {e}"))? as usize;
-        let bit_width = reader
-            .read_u64::<LittleEndian>()
-            .map_err(|e| format!("Failed to read bit_width: {e}"))? as usize;
-        let count = reader
-            .read_u64::<LittleEndian>()
-            .map_err(|e| format!("Failed to read count: {e}"))? as usize;
-
-        let expected_size = (dim as u64).checked_mul(4).and_then(|size| size.checked_add(8))
-            .and_then(|size| size.checked_mul(count as u64)).and_then(|size| size.checked_add(32));
-        let file_size = reader.get_ref().metadata().map_err(|e| e.to_string())?.len();
-        if dim == 0 || expected_size != Some(file_size) {
-            return Err("Invalid vector index size or dimensions".into());
-        }
-        let mut vectors = HashMap::with_capacity(count);
-        for _ in 0..count {
-            let id = reader
-                .read_u64::<LittleEndian>()
-                .map_err(|e| format!("Failed to read vector id: {e}"))?;
-            let mut vec = vec![0.0f32; dim];
-            for val in vec.iter_mut() {
-                *val = reader
-                    .read_f32::<LittleEndian>()
-                    .map_err(|e| format!("Failed to read vector float: {e}"))?;
-            }
-            validate_vector(&vec)?;
-            if vectors.insert(id, vec).is_some() { return Err(format!("Duplicate vector ID: {id}")); }
-        }
-
+        let index = IdMapIndex::load(&path)
+            .map_err(|e| format!("Failed to load index file at {path}: {e}"))?;
         Ok(Self {
-            inner: RwLock::new(IndexInner {
-                dim,
-                bit_width,
-                vectors,
-            }),
+            inner: RwLock::new(index),
         })
     }
 
     pub fn write(&self, path: String) -> Result<(), String> {
         let inner = self.inner.read().map_err(|e| e.to_string())?;
-        let file = File::create(Path::new(&path))
-            .map_err(|e| format!("Failed to create index file at {path}: {e}"))?;
-        let mut writer = BufWriter::new(file);
-
-        writer
-            .write_all(MAGIC)
-            .map_err(|e| format!("Failed to write magic: {e}"))?;
-        writer
-            .write_u32::<LittleEndian>(CURRENT_VERSION)
-            .map_err(|e| format!("Failed to write version: {e}"))?;
-        writer
-            .write_u64::<LittleEndian>(inner.dim as u64)
-            .map_err(|e| format!("Failed to write dim: {e}"))?;
-        writer
-            .write_u64::<LittleEndian>(inner.bit_width as u64)
-            .map_err(|e| format!("Failed to write bit_width: {e}"))?;
-        writer
-            .write_u64::<LittleEndian>(inner.vectors.len() as u64)
-            .map_err(|e| format!("Failed to write count: {e}"))?;
-
-        for (&id, vec) in &inner.vectors {
-            writer
-                .write_u64::<LittleEndian>(id)
-                .map_err(|e| format!("Failed to write vector id: {e}"))?;
-            for &val in vec {
-                writer
-                    .write_f32::<LittleEndian>(val)
-                    .map_err(|e| format!("Failed to write vector value: {e}"))?;
-            }
-        }
-
-        writer
-            .flush()
-            .map_err(|e| format!("Failed to flush index file: {e}"))?;
-        Ok(())
+        inner
+            .write(&path)
+            .map_err(|e| format!("Failed to write index file at {path}: {e}"))
     }
 
-    pub fn add_batch(
-        &self,
-        ids: Vec<u64>,
-        vectors: Vec<f32>,
-        dim: usize,
-    ) -> Result<(), String> {
-        let mut inner = self.inner.write().map_err(|e| e.to_string())?;
-        if inner.dim == 0 {
-            inner.dim = dim;
-        } else if inner.dim != dim {
-            return Err(format!(
-                "Dimension mismatch: expected {}, got {}",
-                inner.dim, dim
-            ));
-        }
-
+    pub fn add_batch(&self, ids: Vec<u64>, vectors: Vec<f32>, dim: usize) -> Result<(), String> {
         if ids.is_empty() {
             return Ok(());
+        }
+        if dim == 0 {
+            return Err("Vector dimensions must be positive".into());
+        }
+
+        let mut inner = self.inner.write().map_err(|e| e.to_string())?;
+        if let Some(existing) = inner.dim_opt() {
+            if existing != dim {
+                return Err(format!("Dimension mismatch: expected {existing}, got {dim}"));
+            }
         }
 
         let count = ids.len();
@@ -169,23 +68,19 @@ impl NativeVectorIndex {
             ));
         }
 
-        if dim == 0 { return Err("Vector dimensions must be positive".into()); }
         let mut seen = HashSet::new();
         for &id in &ids {
-            if inner.vectors.contains_key(&id) || !seen.insert(id) {
+            if inner.contains(id) || !seen.insert(id) {
                 return Err(format!("Duplicate vector ID: {id}"));
             }
         }
-        for vector in vectors.chunks_exact(dim) { validate_vector(vector)?; }
-
-        for (i, &id) in ids.iter().enumerate() {
-            let start = i * dim;
-            let end = start + dim;
-            let vec_slice = vectors[start..end].to_vec();
-            inner.vectors.insert(id, vec_slice);
+        for vector in vectors.chunks_exact(dim) {
+            validate_vector(vector)?;
         }
 
-        Ok(())
+        inner
+            .add_with_ids_2d(&vectors, dim, &ids)
+            .map_err(|e| format!("Failed to add vectors: {e}"))
     }
 
     pub fn search(
@@ -195,52 +90,57 @@ impl NativeVectorIndex {
         allowlist: Option<Vec<u64>>,
     ) -> Result<Vec<RustSearchResult>, String> {
         let inner = self.inner.read().map_err(|e| e.to_string())?;
-        if inner.vectors.is_empty() || inner.dim == 0 || k == 0 {
+        if inner.is_empty() || k == 0 {
             return Ok(Vec::new());
         }
 
-        if query.len() != inner.dim {
+        let dim = inner.dim_opt().unwrap_or(0);
+        if query.len() != dim {
             return Err(format!(
-                "Query dimension mismatch: expected {}, got {}",
-                inner.dim,
+                "Query dimension mismatch: expected {dim}, got {}",
                 query.len()
             ));
         }
-
-        let allow_set: Option<HashSet<u64>> = allowlist.map(|list| list.into_iter().collect());
-
         validate_vector(&query)?;
-        let q_norm = norm(&query);
-        Ok(inner.vectors.iter()
-            .filter(|(id, _)| allow_set.as_ref().is_none_or(|allowed| allowed.contains(id)))
-            .map(|(&id, vector)| {
-                let dot: f64 = query.iter().zip(vector).map(|(&q, &v)| f64::from(q) * f64::from(v)).sum();
-                RustSearchResult { vector_id: id, score: (dot / (q_norm * norm(vector))) as f32 }
-            })
-            .k_smallest_by(k, |a, b| b.score.total_cmp(&a.score).then(a.vector_id.cmp(&b.vector_id)))
+
+        let results = inner
+            .try_search_with_allowlist(&query, k, allowlist.as_deref())
+            .map_err(|e| format!("Search failed: {e}"))?;
+
+        if results.nq == 0 {
+            return Ok(Vec::new());
+        }
+
+        Ok(results
+            .ids_for_query(0)
+            .iter()
+            .zip(results.scores_for_query(0))
+            .map(|(&vector_id, &score)| RustSearchResult { vector_id, score })
             .collect())
     }
 
     pub fn remove(&self, id: u64) -> Result<bool, String> {
         let mut inner = self.inner.write().map_err(|e| e.to_string())?;
-        Ok(inner.vectors.remove(&id).is_some())
+        Ok(inner.remove(id))
     }
 
     pub fn len(&self) -> Result<usize, String> {
         let inner = self.inner.read().map_err(|e| e.to_string())?;
-        Ok(inner.vectors.len())
+        Ok(inner.len())
     }
 
     pub fn dim(&self) -> Result<usize, String> {
         let inner = self.inner.read().map_err(|e| e.to_string())?;
-        Ok(inner.dim)
+        Ok(inner.dim_opt().unwrap_or(0))
     }
-
-
 }
 
 fn norm(vector: &[f32]) -> f64 {
-    vector.iter().map(|&value| f64::from(value).powi(2)).sum::<f64>().sqrt()
+    vector
+        .iter()
+        .map(|&value| f64::from(value).powi(2))
+        .sum::<f64>()
+        .sqrt()
 }
 
 fn validate_vector(vector: &[f32]) -> Result<(), String> {
@@ -255,67 +155,128 @@ mod tests {
     use super::*;
     use std::fs;
 
+    const DIM: usize = 128;
+
+    /// Deterministic pseudo-random unit-ish vectors. Quantized search needs
+    /// realistic dimensionality to be meaningful, so the fixtures are
+    /// generated rather than hand-written.
+    fn synth(n: usize, seed: u64) -> Vec<f32> {
+        let mut state = seed | 1;
+        (0..n * DIM)
+            .map(|_| {
+                state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                ((state >> 33) as f32 / (1u64 << 31) as f32) - 1.0
+            })
+            .collect()
+    }
+
+    fn row(vectors: &[f32], i: usize) -> Vec<f32> {
+        vectors[i * DIM..(i + 1) * DIM].to_vec()
+    }
+
     #[test]
     fn test_turbovec_crud_and_search() {
-        let index = NativeVectorIndex::new(3, 4);
+        let index = NativeVectorIndex::new(DIM, 4).unwrap();
         assert_eq!(index.len().unwrap(), 0);
-        assert_eq!(index.dim().unwrap(), 3);
+        assert_eq!(index.dim().unwrap(), DIM);
 
-        let ids = vec![1, 2, 3];
-        // 3 vectors of dim 3
-        let vectors = vec![
-            1.0, 0.0, 0.0, // id 1: aligned with x
-            0.0, 1.0, 0.0, // id 2: aligned with y
-            0.7071, 0.7071, 0.0, // id 3: 45 degrees between x and y
-        ];
-        index.add_batch(ids, vectors, 3).unwrap();
-        assert_eq!(index.len().unwrap(), 3);
+        let ids: Vec<u64> = (1..=8).collect();
+        let vectors = synth(8, 0xD1536);
+        index.add_batch(ids, vectors.clone(), DIM).unwrap();
+        assert_eq!(index.len().unwrap(), 8);
 
-        // Search near x axis
-        let query = vec![1.0, 0.0, 0.0];
-        let results = index.search(query, 2, None).unwrap();
-        assert_eq!(results.len(), 2);
-        assert_eq!(results[0].vector_id, 1);
-        assert!((results[0].score - 1.0).abs() < 1e-4);
-        assert_eq!(results[1].vector_id, 3);
-        assert!((results[1].score - 0.7071).abs() < 1e-3);
+        // Querying with a stored vector must rank that vector first.
+        let results = index.search(row(&vectors, 2), 3, None).unwrap();
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].vector_id, 3);
+        // Scores are descending within a row.
+        assert!(results[0].score >= results[1].score);
+        assert!(results[1].score >= results[2].score);
 
-        // Test allowlist filter
+        // The allowlist restricts the candidate set.
         let filtered = index
-            .search(vec![1.0, 0.0, 0.0], 5, Some(vec![2, 3]))
+            .search(row(&vectors, 2), 5, Some(vec![5, 7]))
             .unwrap();
         assert_eq!(filtered.len(), 2);
-        assert_eq!(filtered[0].vector_id, 3);
-        assert_eq!(filtered[1].vector_id, 2);
+        let returned: HashSet<u64> = filtered.iter().map(|r| r.vector_id).collect();
+        assert_eq!(returned, HashSet::from([5, 7]));
 
-        // Test remove
         assert!(index.remove(1).unwrap());
         assert!(!index.remove(99).unwrap());
-        assert_eq!(index.len().unwrap(), 2);
+        assert_eq!(index.len().unwrap(), 7);
+        let after_removal = index.search(row(&vectors, 0), 7, None).unwrap();
+        assert!(after_removal.iter().all(|r| r.vector_id != 1));
     }
 
     #[test]
     fn test_turbovec_file_persistence() {
-        let temp_dir = std::env::temp_dir();
-        let test_path = temp_dir.join("test_index.tvec");
+        let test_path = std::env::temp_dir().join("test_index.tv");
         let path_str = test_path.to_str().unwrap().to_string();
 
-        let index = NativeVectorIndex::new(2, 8);
-        let ids = vec![101, 102];
-        let vectors = vec![0.6, 0.8, 1.0, 0.0];
-        index.add_batch(ids, vectors, 2).unwrap();
+        let index = NativeVectorIndex::new(DIM, 4).unwrap();
+        let ids = vec![101, 102, 103];
+        let vectors = synth(3, 0xA55E3);
+        index.add_batch(ids, vectors.clone(), DIM).unwrap();
         index.write(path_str.clone()).unwrap();
 
-        // Load back
         let loaded = NativeVectorIndex::load(path_str.clone()).unwrap();
-        assert_eq!(loaded.len().unwrap(), 2);
-        assert_eq!(loaded.dim().unwrap(), 2);
+        assert_eq!(loaded.len().unwrap(), 3);
+        assert_eq!(loaded.dim().unwrap(), DIM);
 
-        let search_res = loaded.search(vec![1.0, 0.0], 1, None).unwrap();
+        let search_res = loaded.search(row(&vectors, 1), 1, None).unwrap();
         assert_eq!(search_res.len(), 1);
         assert_eq!(search_res[0].vector_id, 102);
-        assert!((search_res[0].score - 1.0).abs() < 1e-4);
 
         let _ = fs::remove_file(test_path);
+    }
+
+    #[test]
+    fn test_lazy_dimension_is_locked_by_first_add() {
+        let index = NativeVectorIndex::new(0, 4).unwrap();
+        assert_eq!(index.dim().unwrap(), 0);
+
+        index.add_batch(vec![1], synth(1, 7), DIM).unwrap();
+        assert_eq!(index.dim().unwrap(), DIM);
+
+        let err = index
+            .add_batch(vec![2], vec![1.0; DIM * 2], DIM * 2)
+            .unwrap_err();
+        assert!(err.contains("Dimension mismatch"), "{err}");
+    }
+
+    #[test]
+    fn test_turbovec_rejects_bad_input() {
+        let index = NativeVectorIndex::new(DIM, 4).unwrap();
+        let vectors = synth(2, 11);
+        index.add_batch(vec![1, 2], vectors, DIM).unwrap();
+
+        let duplicate = index.add_batch(vec![2], synth(1, 12), DIM).unwrap_err();
+        assert!(duplicate.contains("Duplicate vector ID"), "{duplicate}");
+
+        let in_batch = index
+            .add_batch(vec![9, 9], synth(2, 13), DIM)
+            .unwrap_err();
+        assert!(in_batch.contains("Duplicate vector ID"), "{in_batch}");
+
+        let short = index.add_batch(vec![3], vec![0.5; DIM - 1], DIM).unwrap_err();
+        assert!(short.contains("Vector buffer size mismatch"), "{short}");
+
+        let zero = index.add_batch(vec![4], vec![0.0; DIM], DIM).unwrap_err();
+        assert!(zero.contains("finite non-zero"), "{zero}");
+
+        let query_dim = index.search(vec![1.0; DIM + 1], 1, None).unwrap_err();
+        assert!(query_dim.contains("Query dimension mismatch"), "{query_dim}");
+
+        // An unsupported bit width is rejected at construction.
+        assert!(NativeVectorIndex::new(DIM, 8).is_err());
+    }
+
+    #[test]
+    fn test_empty_and_zero_k_searches_are_empty() {
+        let index = NativeVectorIndex::new(DIM, 4).unwrap();
+        assert!(index.search(vec![1.0; DIM], 5, None).unwrap().is_empty());
+
+        index.add_batch(vec![1], synth(1, 17), DIM).unwrap();
+        assert!(index.search(vec![1.0; DIM], 0, None).unwrap().is_empty());
     }
 }

@@ -98,7 +98,9 @@ class ChatController extends StateNotifier<ChatState> {
       var chat = _ref.read(currentChatProvider);
       if (chat == null) {
         final title = text.length > 35 ? '${text.substring(0, 32)}...' : text;
-        chat = await _ref.read(chatsProvider.notifier).createNewChat(title);
+        chat = await _ref
+            .read(projectChatsProvider(collection.id).notifier)
+            .createNewChat(title);
       }
       if (!_isCurrent(generation)) return;
       final history = chat.messages
@@ -121,7 +123,11 @@ class ChatController extends StateNotifier<ChatState> {
       _ref.read(currentChatProvider.notifier).state = updated;
       final turn = _ChatTurn(updated, settings.chatModel);
       _turn = turn;
-      unawaited(_ref.read(chatsProvider.notifier).refresh());
+      unawaited(
+        _ref
+            .read(projectChatsProvider(collection.id).notifier)
+            .refresh(),
+      );
       final index = await _ref
           .read(paperRepositoryProvider(collection.id))
           .openIndex();
@@ -232,7 +238,9 @@ class ChatController extends StateNotifier<ChatState> {
             .read(localStorageProvider)
             .saveChat(turn.chat.collectionId, updated);
         if (_isCurrent(generation)) {
-          await _ref.read(chatsProvider.notifier).refresh();
+          await _ref
+              .read(projectChatsProvider(turn.chat.collectionId).notifier)
+              .refresh();
         }
       } catch (saveError) {
         error = 'Answer could not be saved: $saveError';
