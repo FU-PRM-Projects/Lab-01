@@ -841,6 +841,7 @@ class _SectionRowState extends State<_SectionRow> {
               data: section.text.trim(),
               selectable: true,
               styleSheet: _sectionMarkdownStyle(context),
+              blockSyntaxes: mathBlockSyntaxes,
               inlineSyntaxes: mathInlineSyntaxes,
               builders: mathBuilders,
             ),

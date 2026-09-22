@@ -304,6 +304,7 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
                           data: _cleanMarkdown(widget.citation.excerpt),
                           selectable: false,
                           styleSheet: _buildMarkdownStyle(context),
+                          blockSyntaxes: mathBlockSyntaxes,
                           inlineSyntaxes: [
                             ...mathInlineSyntaxes,
                             _UnderlineSyntax(),

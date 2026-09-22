@@ -463,6 +463,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       data: content,
       selectable: false,
       styleSheet: createMarkdownStyle(context),
+      blockSyntaxes: mathBlockSyntaxes,
       inlineSyntaxes: mathInlineSyntaxes,
       builders: mathBuilders,
       onTapLink: (text, href, title) {
@@ -649,6 +650,7 @@ class _StreamingMessageBubble extends ConsumerWidget {
                       data: text,
                       selectable: false,
                       styleSheet: _ChatPageState.createMarkdownStyle(context),
+                      blockSyntaxes: mathBlockSyntaxes,
                       inlineSyntaxes: mathInlineSyntaxes,
                       builders: mathBuilders,
                       onTapLink: (t, href, title) {

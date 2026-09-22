@@ -8,23 +8,56 @@ import 'package:markdown/markdown.dart' as md;
 // convention when it quotes or restates them. flutter_markdown_plus only
 // understands plain Markdown, so without this, a formula like
 // `$H_z^o \in \mathbb{R}^{N_z \times D_1}$` shows up as raw text instead
-// of a rendered equation. These two InlineSyntax classes recognize
-// `$$...$$` (display/block) and `$...$` (inline) math spans and hand them
-// off to flutter_math_fork for rendering.
+// of a rendered equation.
+//
+// Display math (`$$...$$`) is a BlockSyntax, not an InlineSyntax: it needs
+// to occupy its own line rather than being embedded as a WidgetSpan inside
+// a run of text, and MarkdownBody only lays a custom element out as a
+// block when both (a) the syntax that produced it is registered via
+// `blockSyntaxes` and (b) its builder's `isBlockElement()` returns true.
+// Inline math (`$...$`) stays an InlineSyntax and is registered via
+// `inlineSyntaxes` as usual.
 
-/// Matches display ("block") math delimited by `$$...$$`.
-///
-/// Registered before [MathInlineSyntax] so a `$$...$$` span is consumed in
-/// full rather than being picked apart by the single-`$` pattern.
-class MathDisplaySyntax extends md.InlineSyntax {
-  MathDisplaySyntax() : super(r'\$\$([\s\S]+?)\$\$');
+/// Matches a display ("block") math span opened by a line starting with
+/// `$$`, closed either on that same line (`$$formula$$`) or on a later
+/// line ending in `$$`.
+class MathDisplaySyntax extends md.BlockSyntax {
+  const MathDisplaySyntax();
 
   @override
-  bool onMatch(md.InlineParser parser, Match match) {
-    final tex = (match[1] ?? '').trim();
-    if (tex.isEmpty) return false;
-    parser.addNode(md.Element.text('math_display', tex));
-    return true;
+  RegExp get pattern => RegExp(r'^\s*\$\$');
+
+  @override
+  md.Node parse(md.BlockParser parser) {
+    final buffer = StringBuffer();
+    final opening = parser.current.content.trimLeft();
+    final afterOpen = opening.substring(2);
+
+    final trimmedAfterOpen = afterOpen.trimRight();
+    if (trimmedAfterOpen.endsWith(r'$$') && trimmedAfterOpen.length > 2) {
+      buffer.write(
+        trimmedAfterOpen.substring(0, trimmedAfterOpen.length - 2),
+      );
+      parser.advance();
+      return md.Element.text('math_display', buffer.toString().trim());
+    }
+
+    if (afterOpen.trim().isNotEmpty) buffer.writeln(afterOpen);
+    parser.advance();
+
+    while (!parser.isDone) {
+      final line = parser.current.content;
+      final trimmedLine = line.trimRight();
+      if (trimmedLine.endsWith(r'$$')) {
+        buffer.write(trimmedLine.substring(0, trimmedLine.length - 2));
+        parser.advance();
+        break;
+      }
+      buffer.writeln(line);
+      parser.advance();
+    }
+
+    return md.Element.text('math_display', buffer.toString().trim());
   }
 }
 
@@ -67,6 +100,9 @@ class MathInlineBuilder extends MarkdownElementBuilder {
 /// overflows the chat bubble.
 class MathDisplayBuilder extends MarkdownElementBuilder {
   @override
+  bool isBlockElement() => true;
+
+  @override
   Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
     final tex = element.textContent;
     return Padding(
@@ -88,11 +124,11 @@ class MathDisplayBuilder extends MarkdownElementBuilder {
   }
 }
 
+/// Pass as a `MarkdownBody`'s `blockSyntaxes` (merge with any others).
+final List<md.BlockSyntax> mathBlockSyntaxes = [const MathDisplaySyntax()];
+
 /// Pass as a `MarkdownBody`'s `inlineSyntaxes` (merge with any others).
-final List<md.InlineSyntax> mathInlineSyntaxes = [
-  MathDisplaySyntax(),
-  MathInlineSyntax(),
-];
+final List<md.InlineSyntax> mathInlineSyntaxes = [MathInlineSyntax()];
 
 /// Merge into a `MarkdownBody`'s `builders` (keys must stay unique).
 final Map<String, MarkdownElementBuilder> mathBuilders = {
