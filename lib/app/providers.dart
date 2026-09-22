@@ -55,20 +55,9 @@ class DataDirectoryController {
     final newSettings = await newStorage.loadSettings();
     await _ref.read(settingsProvider.notifier).update(newSettings);
     final collections = await newStorage.listCollections();
-    Collection? initial = collections.firstOrNull;
-    if (initial == null) {
-      initial = Collection(
-        id: 'col_lab_05',
-        name: 'lab_05',
-        createdAt: DateTime.now().toUtc(),
-        embeddingProfile: EmbeddingProfile(
-          id: 'profile_gemini_2',
-          model: newSettings.defaultEmbeddingModel,
-          dimensions: newSettings.defaultEmbeddingDimensions,
-        ),
-      );
-      await newStorage.saveCollection(initial);
-    }
+    // No collection is auto-created here: an empty list just means this
+    // directory has no projects yet, and the UI shows its own empty state.
+    final Collection? initial = collections.firstOrNull;
     _ref.read(currentCollectionProvider.notifier).state = initial;
     _ref.read(activeCitationProvider.notifier).state = null;
     _ref.read(currentChatProvider.notifier).state = null;

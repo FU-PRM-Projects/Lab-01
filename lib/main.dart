@@ -4,7 +4,6 @@ import 'package:lab_05_rust/paper_native.dart';
 
 import 'package:lab_05/app/app.dart';
 import 'package:lab_05/app/providers.dart';
-import 'package:lab_05/data/models/collection.dart';
 import 'package:lab_05/data/services/local_storage.dart';
 
 Future<void> main() async {
@@ -13,19 +12,9 @@ Future<void> main() async {
   final storage = await LocalStorage.createDefault();
   final settings = await storage.loadSettings();
   final collections = await storage.listCollections();
-  final initialCollection =
-      collections.firstOrNull ??
-      Collection(
-        id: 'col_lab_05',
-        name: 'lab_05',
-        createdAt: DateTime.now().toUtc(),
-        embeddingProfile: EmbeddingProfile(
-          id: 'profile_gemini_2',
-          model: settings.defaultEmbeddingModel,
-          dimensions: settings.defaultEmbeddingDimensions,
-        ),
-      );
-  if (collections.isEmpty) await storage.saveCollection(initialCollection);
+  // No collection is auto-created here: an empty list means the user has
+  // not made a project yet, and the UI shows its own empty state for that.
+  final initialCollection = collections.firstOrNull;
 
   runApp(
     ProviderScope(
