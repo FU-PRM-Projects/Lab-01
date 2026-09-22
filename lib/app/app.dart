@@ -10,9 +10,7 @@ class PaperChatApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeSetting = ref.watch(
-      settingsProvider.select((s) => s.theme),
-    );
+    final themeSetting = ref.watch(settingsProvider.select((s) => s.theme));
 
     final ThemeMode themeMode;
     if (themeSetting == 'light') {

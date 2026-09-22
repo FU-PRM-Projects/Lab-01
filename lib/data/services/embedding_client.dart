@@ -2,11 +2,56 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:http/retry.dart';
 
 import 'package:lab_05/data/models/app_settings.dart';
+
+/// One thing to embed: a passage, or a figure with the text that describes it.
+///
+/// A figure embeds as a single joint vector over its image *and* its caption,
+/// so it lands in the same space as the text chunks and needs no second index
+/// or separate query path.
+class EmbeddingInput {
+  final String text;
+
+  /// Image bytes for a figure, or null for a plain passage.
+  final Uint8List? imageBytes;
+
+  /// Media type of [imageBytes], e.g. `image/png`.
+  final String? imageMediaType;
+
+  const EmbeddingInput.text(this.text)
+    : imageBytes = null,
+      imageMediaType = null;
+
+  const EmbeddingInput.image({
+    required this.text,
+    required Uint8List bytes,
+    required String mediaType,
+  }) : imageBytes = bytes,
+       imageMediaType = mediaType;
+
+  bool get hasImage => imageBytes != null;
+
+  /// The OpenRouter content array for this input.
+  Map<String, dynamic> toContent() => {
+    'content': [
+      if (text.trim().isNotEmpty) {'type': 'text', 'text': text},
+      if (imageBytes != null)
+        {
+          'type': 'image_url',
+          'image_url': {
+            'url':
+                'data:${imageMediaType ?? 'image/png'};base64,'
+                '${base64Encode(imageBytes!)}',
+          },
+        },
+    ],
+  };
+}
 
 class EmbeddingClient {
   EmbeddingClient({
@@ -39,12 +84,40 @@ class EmbeddingClient {
   Future<List<List<double>>> embedTexts(
     List<String> texts, {
     int batchSize = 16,
+  }) => embedInputs([
+    for (final text in texts) EmbeddingInput.text(text),
+  ], batchSize: batchSize);
+
+  /// Embeds a mix of passages and figures, returning one vector per input in
+  /// the order they were given.
+  ///
+  /// Batches carrying an image are sent in smaller groups: a figure is worth
+  /// a few hundred tokens against a passage's few dozen, and a full batch of
+  /// them makes for a large request and a slow one.
+  Future<List<List<double>>> embedInputs(
+    List<EmbeddingInput> inputs, {
+    int batchSize = 16,
+    int imageBatchSize = 4,
   }) async {
     RangeError.checkValueInInterval(batchSize, 1, 2048, 'batchSize');
+    RangeError.checkValueInInterval(imageBatchSize, 1, 2048, 'imageBatchSize');
+
     final embeddings = <List<double>>[];
-    for (var start = 0; start < texts.length; start += batchSize) {
+    var start = 0;
+    while (start < inputs.length) {
       if (_abort.isCompleted) throw StateError('Embedding request cancelled');
-      final batch = texts.sublist(start, min(start + batchSize, texts.length));
+
+      // Group by kind so a single figure does not shrink a whole text batch.
+      final isImageBatch = inputs[start].hasImage;
+      final limit = isImageBatch ? imageBatchSize : batchSize;
+      var end = start;
+      while (end < inputs.length &&
+          end - start < limit &&
+          inputs[end].hasImage == isImageBatch) {
+        end++;
+      }
+      final batch = inputs.sublist(start, end);
+      start = end;
       final request =
           http.AbortableRequest(
               'POST',
@@ -57,7 +130,12 @@ class EmbeddingClient {
             })
             ..body = jsonEncode({
               'model': model,
-              'input': batch,
+              // Plain strings for text-only batches, keeping the wire format
+              // identical to what text documents have always sent; the content
+              // array form is only needed once an image is involved.
+              'input': isImageBatch
+                  ? [for (final input in batch) input.toContent()]
+                  : [for (final input in batch) input.text],
               'dimensions': dimensions,
             });
       final response = await http.Response.fromStream(

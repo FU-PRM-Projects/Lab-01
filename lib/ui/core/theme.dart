@@ -3,33 +3,11 @@ import 'package:flutter/material.dart';
 /// Semantic colors and palette helpers.
 class AppColors {
   // Static status colors
-  static const Color danger = Color(0xFFEF4444);
   static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);
-  static const Color info = Color(0xFF3B82F6);
 
   // Default seed color for Material 3 dynamic color generation
   static const Color seedColor = Color(0xFF4B5563);
-
-  // Backward compatibility colors (mapped to dark palette)
-  static const Color darkBg = Color(0xFF171717);
-  static const Color sidebarBg = Color(0xFF202020);
-  static const Color cardBg = Color(0xFF242424);
-  static const Color composerBg = Color(0xFF292929);
-  static const Color border = Color(0xFF3A3A3A);
-  static const Color borderSubtle = Color(0xFF303030);
-  static const Color hover = Color(0xFF303030);
-  static const Color selected = Color(0xFF383838);
-
-  static const Color textPrimary = Color(0xFFEDEDF2);
-  static const Color textSecondary = Color(0xFFA1A1AC);
-  static const Color textMuted = Color(0xFF71717E);
-
-  static const Color accentBlue = Color(0xFF5B8DEF);
-  static const Color accentBlueHover = Color(0xFF4779D9);
-  static const Color citationChip = Color(0xFF1E293B);
-  static const Color citationChipBorder = Color(0xFF334155);
-  static const Color citationChipText = Color(0xFF60A5FA);
 }
 
 /// Material 3 Dark Theme

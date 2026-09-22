@@ -18,21 +18,86 @@ class LocalStorage {
 
   LocalStorage({required this.rootDir});
 
-  static Future<LocalStorage> createDefault([Directory? overrideDir]) async {
-    Directory baseDir;
-    if (overrideDir != null) {
-      baseDir = overrideDir;
+  @visibleForTesting
+  static Directory? overrideAppSupportDir;
+
+  static Future<Directory> getDefaultDataDirectory() async {
+    final Directory appSupport;
+    if (overrideAppSupportDir != null) {
+      appSupport = overrideAppSupportDir!;
     } else {
-      final appSupport = await getApplicationSupportDirectory();
-      baseDir = Directory(p.join(appSupport.path, 'PaperChat'));
+      appSupport = await getApplicationSupportDirectory();
     }
-    if (!baseDir.existsSync()) {
-      baseDir.createSync(recursive: true);
+    return Directory(p.join(appSupport.path, 'PaperChat'));
+  }
+
+  static Future<File> _getDataDirectoryConfigFile() async {
+    final Directory appSupport;
+    if (overrideAppSupportDir != null) {
+      appSupport = overrideAppSupportDir!;
+    } else {
+      appSupport = await getApplicationSupportDirectory();
     }
-    final storage = LocalStorage(rootDir: baseDir);
+    final configDir = Directory(p.join(appSupport.path, 'PaperChat'));
+    if (!configDir.existsSync()) {
+      configDir.createSync(recursive: true);
+    }
+    return File(p.join(configDir.path, 'data_directory.txt'));
+  }
+
+  static Future<String?> getCustomDataDirectoryPath() async {
+    try {
+      final file = await _getDataDirectoryConfigFile();
+      if (await file.exists()) {
+        final path = (await file.readAsString()).trim();
+        if (path.isNotEmpty) return path;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<void> setCustomDataDirectoryPath(String? newPath) async {
+    try {
+      final file = await _getDataDirectoryConfigFile();
+      if (newPath == null || newPath.trim().isEmpty) {
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } else {
+        await file.writeAsString(newPath.trim(), flush: true);
+      }
+    } catch (e) {
+      debugPrint('Warning: Could not save data directory config: $e');
+    }
+  }
+
+  static Future<Directory> resolveDataDirectory([
+    Directory? overrideDir,
+  ]) async {
+    if (overrideDir != null) return overrideDir;
+    final customPath = await getCustomDataDirectoryPath();
+    if (customPath != null) {
+      final dir = Directory(customPath);
+      if (dir.existsSync()) {
+        return dir;
+      }
+    }
+    return getDefaultDataDirectory();
+  }
+
+  static Future<LocalStorage> createForDirectory(Directory dir) async {
+    if (!dir.existsSync()) {
+      dir.createSync(recursive: true);
+    }
+    final storage = LocalStorage(rootDir: dir);
     await storage._acquireAppLock();
     await storage.runStartupRecovery();
     return storage;
+  }
+
+  static Future<LocalStorage> createDefault([Directory? overrideDir]) async {
+    final baseDir = await resolveDataDirectory(overrideDir);
+    return createForDirectory(baseDir);
   }
 
   Future<void> _acquireAppLock() async {
@@ -69,11 +134,24 @@ class LocalStorage {
       p.join(collectionDir(collectionId), 'index');
   String chatsDir(String collectionId) =>
       p.join(collectionDir(collectionId), 'chats');
+  String referencesDir(String collectionId) =>
+      p.join(collectionDir(collectionId), 'references');
 
   String paperPdfPath(String collectionId, String documentId) =>
       p.join(documentsDir(collectionId), '$documentId.pdf');
   String paperMetadataPath(String collectionId, String documentId) =>
       p.join(metadataDir(collectionId), '$documentId.json');
+  String referencesPath(String collectionId, String documentId) =>
+      p.join(referencesDir(collectionId), '$documentId.json');
+
+  /// Directory holding one document's extracted figures.
+  String figuresDir(String collectionId, String documentId) =>
+      p.join(collectionDir(collectionId), 'figures', documentId);
+
+  /// Absolute path of a figure, given the name stored on its chunk.
+  String figurePath(String collectionId, String documentId, String name) =>
+      p.join(figuresDir(collectionId, documentId), name);
+
   String indexVectorsPath(String collectionId) =>
       p.join(indexDir(collectionId), 'vectors.tvim');
   String indexStatePath(String collectionId) =>
@@ -243,7 +321,24 @@ class LocalStorage {
         debugPrint('Warning: Could not delete PDF file: $e');
       }
     }
+    final referenceFile = File(referencesPath(collectionId, documentId));
+    if (await referenceFile.exists()) {
+      await referenceFile.delete();
+    }
   }
+
+  // Resolved bibliography links (Crossref lookups are cached so a paper is
+  // only ever resolved once).
+  Future<Map<String, dynamic>?> loadResolvedReferences(
+    String collectionId,
+    String documentId,
+  ) => readJsonSafely(referencesPath(collectionId, documentId));
+
+  Future<void> saveResolvedReferences(
+    String collectionId,
+    String documentId,
+    Map<String, dynamic> data,
+  ) => writeJsonSafely(referencesPath(collectionId, documentId), data);
 
   // Chats
   Future<List<Chat>> listChats(String collectionId) async {

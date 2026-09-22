@@ -118,6 +118,81 @@ void main() {
     },
   );
 
+  test('Every tool call is logged with its arguments and outcome', () async {
+    var count = 0;
+    final model = agent(
+      MockClient((request) async {
+        count++;
+        if (count == 1) {
+          return _stream([
+            {
+              'tool_calls': [
+                {
+                  'index': 0,
+                  'id': 'call-1',
+                  'type': 'function',
+                  'function': {
+                    'name': 'read_page',
+                    'arguments': '{"documentId":"doc_test","page":1}',
+                  },
+                },
+                {
+                  'index': 1,
+                  'id': 'call-2',
+                  'type': 'function',
+                  'function': {
+                    'name': 'read_page',
+                    'arguments': '{"documentId":"doc_test","page":99}',
+                  },
+                },
+              ],
+            },
+          ], finishReason: 'tool_calls');
+        }
+        return _stream([
+          {'content': 'Answer [S1].'},
+        ]);
+      }),
+    );
+    final events = await model
+        .streamAnswer(collectionId: 'collection', userQuestion: 'Explain')
+        .toList();
+
+    final started = events.whereType<ToolCallStarted>().toList();
+    final finished = events.whereType<ToolCallFinished>().toList();
+    // The opening retrieval plus both model-requested calls.
+    expect(started.map((event) => event.call.id), [
+      'retrieval',
+      'call-1',
+      'call-2',
+    ]);
+    expect(started.every((event) => event.call.isRunning), isTrue);
+    expect(
+      finished.map((event) => event.call.id),
+      started.map((event) => event.call.id),
+    );
+
+    final retrieval = finished.first.call;
+    expect(retrieval.name, 'search_papers');
+    expect(retrieval.arguments['query'], 'Explain');
+    expect(retrieval.summary, '1 passage');
+    expect(retrieval.isFailed, isFalse);
+    expect(retrieval.durationMs, isNotNull);
+
+    final page = finished[1].call;
+    expect(page.arguments, {'documentId': 'doc_test', 'page': 1});
+    expect(page.summary, '1 passage');
+    expect(page.resultPreview, contains('Exact evidence'));
+
+    // A call the agent rejects is logged as failed, with the reason shown.
+    final outOfRange = finished[2].call;
+    expect(outOfRange.arguments['page'], 99);
+    expect(outOfRange.isFailed, isTrue);
+    expect(outOfRange.summary, 'Page is outside this document.');
+
+    expect(events.whereType<ChatDone>(), hasLength(1));
+  });
+
   test('Tool budget applies to every call in a multi-tool response', () async {
     var count = 0;
     final model = agent(

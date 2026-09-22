@@ -3,7 +3,7 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
-import 'api/pdf_parser.dart';
+import 'api/pdf_images.dart';
 import 'api/vector_index.dart';
 
 import 'dart:async';
@@ -70,7 +70,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1922943509;
+  int get rustContentHash => -1449220834;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -123,21 +123,13 @@ abstract class RustLibApi extends BaseApi {
     required String path,
   });
 
-  Future<List<RustPaperChunk>> crateApiPdfParserChunkText({
-    required String pageText,
-    required int pageNum,
-    required String documentId,
-    required String section,
-    required int startOrdinal,
+  Future<StrippedPdf> crateApiPdfImagesExtractAndStripImages({
+    required String pdfPath,
+    required int minWidth,
+    required int minHeight,
   });
 
   Future<void> crateApiInitApp();
-
-  Future<RustPdfProcessedResult> crateApiPdfParserParsePdf({
-    required String filePath,
-    required String documentId,
-    String? fallbackTitle,
-  });
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_NativeVectorIndex;
@@ -326,7 +318,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         codec: SseCodec(
           decodeSuccessData:
               sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex,
-          decodeErrorData: null,
+          decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiVectorIndexNativeVectorIndexNewConstMeta,
         argValues: [dim, bitWidth],
@@ -460,22 +452,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<List<RustPaperChunk>> crateApiPdfParserChunkText({
-    required String pageText,
-    required int pageNum,
-    required String documentId,
-    required String section,
-    required int startOrdinal,
+  Future<StrippedPdf> crateApiPdfImagesExtractAndStripImages({
+    required String pdfPath,
+    required int minWidth,
+    required int minHeight,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(pageText, serializer);
-          sse_encode_i_32(pageNum, serializer);
-          sse_encode_String(documentId, serializer);
-          sse_encode_String(section, serializer);
-          sse_encode_i_32(startOrdinal, serializer);
+          sse_encode_String(pdfPath, serializer);
+          sse_encode_u_32(minWidth, serializer);
+          sse_encode_u_32(minHeight, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -484,20 +472,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_list_rust_paper_chunk,
-          decodeErrorData: null,
+          decodeSuccessData: sse_decode_stripped_pdf,
+          decodeErrorData: sse_decode_String,
         ),
-        constMeta: kCrateApiPdfParserChunkTextConstMeta,
-        argValues: [pageText, pageNum, documentId, section, startOrdinal],
+        constMeta: kCrateApiPdfImagesExtractAndStripImagesConstMeta,
+        argValues: [pdfPath, minWidth, minHeight],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiPdfParserChunkTextConstMeta => const TaskConstMeta(
-    debugName: "chunk_text",
-    argNames: ["pageText", "pageNum", "documentId", "section", "startOrdinal"],
-  );
+  TaskConstMeta get kCrateApiPdfImagesExtractAndStripImagesConstMeta =>
+      const TaskConstMeta(
+        debugName: "extract_and_strip_images",
+        argNames: ["pdfPath", "minWidth", "minHeight"],
+      );
 
   @override
   Future<void> crateApiInitApp() {
@@ -526,42 +515,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiInitAppConstMeta =>
       const TaskConstMeta(debugName: "init_app", argNames: []);
 
-  @override
-  Future<RustPdfProcessedResult> crateApiPdfParserParsePdf({
-    required String filePath,
-    required String documentId,
-    String? fallbackTitle,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(filePath, serializer);
-          sse_encode_String(documentId, serializer);
-          sse_encode_opt_String(fallbackTitle, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 11,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_rust_pdf_processed_result,
-          decodeErrorData: sse_decode_String,
-        ),
-        constMeta: kCrateApiPdfParserParsePdfConstMeta,
-        argValues: [filePath, documentId, fallbackTitle],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPdfParserParsePdfConstMeta => const TaskConstMeta(
-    debugName: "parse_pdf",
-    argNames: ["filePath", "documentId", "fallbackTitle"],
-  );
-
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_NativeVectorIndex => wire
       .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex;
@@ -586,14 +539,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return NativeVectorIndexImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
-  int dco_decode_CastedPrimitive_i_64(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    throw UnimplementedError(
-      'Not implemented in this codec, please use the other one',
-    );
   }
 
   @protected
@@ -634,27 +579,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ExtractedImage dco_decode_extracted_image(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return ExtractedImage(
+      page: dco_decode_u_32(arr[0]),
+      indexOnPage: dco_decode_u_32(arr[1]),
+      name: dco_decode_String(arr[2]),
+      width: dco_decode_u_32(arr[3]),
+      height: dco_decode_u_32(arr[4]),
+      mediaType: dco_decode_String(arr[5]),
+      bytes: dco_decode_list_prim_u_8_strict(arr[6]),
+    );
+  }
+
+  @protected
   double dco_decode_f_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as double;
   }
 
   @protected
-  int dco_decode_i_32(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw as int;
-  }
-
-  @protected
-  PlatformInt64 dco_decode_i_64(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dcoDecodeI64(raw);
-  }
-
-  @protected
   List<int> dco_decode_list_CastedPrimitive_u_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_CastedPrimitive_u_64).toList();
+  }
+
+  @protected
+  List<ExtractedImage> dco_decode_list_extracted_image(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_extracted_image).toList();
   }
 
   @protected
@@ -670,21 +626,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  Int32List dco_decode_list_prim_i_32_strict(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw as Int32List;
-  }
-
-  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
-  }
-
-  @protected
-  List<RustPaperChunk> dco_decode_list_rust_paper_chunk(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return (raw as List<dynamic>).map(dco_decode_rust_paper_chunk).toList();
   }
 
   @protected
@@ -694,49 +638,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  String? dco_decode_opt_String(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null ? null : dco_decode_String(raw);
-  }
-
-  @protected
   List<int>? dco_decode_opt_list_CastedPrimitive_u_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_list_CastedPrimitive_u_64(raw);
-  }
-
-  @protected
-  RustPaperChunk dco_decode_rust_paper_chunk(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
-    return RustPaperChunk(
-      id: dco_decode_String(arr[0]),
-      vectorId: dco_decode_CastedPrimitive_i_64(arr[1]),
-      page: dco_decode_i_32(arr[2]),
-      ordinal: dco_decode_i_32(arr[3]),
-      section: dco_decode_String(arr[4]),
-      startChar: dco_decode_i_32(arr[5]),
-      endChar: dco_decode_i_32(arr[6]),
-      text: dco_decode_String(arr[7]),
-    );
-  }
-
-  @protected
-  RustPdfProcessedResult dco_decode_rust_pdf_processed_result(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
-    return RustPdfProcessedResult(
-      title: dco_decode_String(arr[0]),
-      pageCount: dco_decode_i_32(arr[1]),
-      chunks: dco_decode_list_rust_paper_chunk(arr[2]),
-      emptyPages: dco_decode_list_prim_i_32_strict(arr[3]),
-      pdfType: dco_decode_String(arr[4]),
-      needsOcrPages: dco_decode_list_prim_i_32_strict(arr[5]),
-    );
   }
 
   @protected
@@ -749,6 +653,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       vectorId: dco_decode_CastedPrimitive_u_64(arr[0]),
       score: dco_decode_f_32(arr[1]),
     );
+  }
+
+  @protected
+  StrippedPdf dco_decode_stripped_pdf(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return StrippedPdf(
+      pdf: dco_decode_list_prim_u_8_strict(arr[0]),
+      images: dco_decode_list_extracted_image(arr[1]),
+      pageCount: dco_decode_u_32(arr[2]),
+      originalBytes: dco_decode_CastedPrimitive_u_64(arr[3]),
+      skipped: dco_decode_u_32(arr[4]),
+    );
+  }
+
+  @protected
+  int dco_decode_u_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
   }
 
   @protected
@@ -800,13 +725,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  int sse_decode_CastedPrimitive_i_64(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var inner = sse_decode_i_64(deserializer);
-    return inner.toInt();
-  }
-
-  @protected
   int sse_decode_CastedPrimitive_u_64(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_u_64(deserializer);
@@ -846,21 +764,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ExtractedImage sse_decode_extracted_image(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_page = sse_decode_u_32(deserializer);
+    var var_indexOnPage = sse_decode_u_32(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_width = sse_decode_u_32(deserializer);
+    var var_height = sse_decode_u_32(deserializer);
+    var var_mediaType = sse_decode_String(deserializer);
+    var var_bytes = sse_decode_list_prim_u_8_strict(deserializer);
+    return ExtractedImage(
+      page: var_page,
+      indexOnPage: var_indexOnPage,
+      name: var_name,
+      width: var_width,
+      height: var_height,
+      mediaType: var_mediaType,
+      bytes: var_bytes,
+    );
+  }
+
+  @protected
   double sse_decode_f_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getFloat32();
-  }
-
-  @protected
-  int sse_decode_i_32(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getInt32();
-  }
-
-  @protected
-  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getPlatformInt64();
   }
 
   @protected
@@ -871,6 +798,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <int>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_CastedPrimitive_u_64(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ExtractedImage> sse_decode_list_extracted_image(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ExtractedImage>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_extracted_image(deserializer));
     }
     return ans_;
   }
@@ -890,31 +831,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  Int32List sse_decode_list_prim_i_32_strict(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var len_ = sse_decode_i_32(deserializer);
-    return deserializer.buffer.getInt32List(len_);
-  }
-
-  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
     return deserializer.buffer.getUint8List(len_);
-  }
-
-  @protected
-  List<RustPaperChunk> sse_decode_list_rust_paper_chunk(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    var len_ = sse_decode_i_32(deserializer);
-    var ans_ = <RustPaperChunk>[];
-    for (var idx_ = 0; idx_ < len_; ++idx_) {
-      ans_.add(sse_decode_rust_paper_chunk(deserializer));
-    }
-    return ans_;
   }
 
   @protected
@@ -932,17 +852,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  String? sse_decode_opt_String(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    if (sse_decode_bool(deserializer)) {
-      return (sse_decode_String(deserializer));
-    } else {
-      return null;
-    }
-  }
-
-  @protected
   List<int>? sse_decode_opt_list_CastedPrimitive_u_64(
     SseDeserializer deserializer,
   ) {
@@ -956,55 +865,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  RustPaperChunk sse_decode_rust_paper_chunk(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_id = sse_decode_String(deserializer);
-    var var_vectorId = sse_decode_CastedPrimitive_i_64(deserializer);
-    var var_page = sse_decode_i_32(deserializer);
-    var var_ordinal = sse_decode_i_32(deserializer);
-    var var_section = sse_decode_String(deserializer);
-    var var_startChar = sse_decode_i_32(deserializer);
-    var var_endChar = sse_decode_i_32(deserializer);
-    var var_text = sse_decode_String(deserializer);
-    return RustPaperChunk(
-      id: var_id,
-      vectorId: var_vectorId,
-      page: var_page,
-      ordinal: var_ordinal,
-      section: var_section,
-      startChar: var_startChar,
-      endChar: var_endChar,
-      text: var_text,
-    );
-  }
-
-  @protected
-  RustPdfProcessedResult sse_decode_rust_pdf_processed_result(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_title = sse_decode_String(deserializer);
-    var var_pageCount = sse_decode_i_32(deserializer);
-    var var_chunks = sse_decode_list_rust_paper_chunk(deserializer);
-    var var_emptyPages = sse_decode_list_prim_i_32_strict(deserializer);
-    var var_pdfType = sse_decode_String(deserializer);
-    var var_needsOcrPages = sse_decode_list_prim_i_32_strict(deserializer);
-    return RustPdfProcessedResult(
-      title: var_title,
-      pageCount: var_pageCount,
-      chunks: var_chunks,
-      emptyPages: var_emptyPages,
-      pdfType: var_pdfType,
-      needsOcrPages: var_needsOcrPages,
-    );
-  }
-
-  @protected
   RustSearchResult sse_decode_rust_search_result(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_vectorId = sse_decode_CastedPrimitive_u_64(deserializer);
     var var_score = sse_decode_f_32(deserializer);
     return RustSearchResult(vectorId: var_vectorId, score: var_score);
+  }
+
+  @protected
+  StrippedPdf sse_decode_stripped_pdf(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_pdf = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_images = sse_decode_list_extracted_image(deserializer);
+    var var_pageCount = sse_decode_u_32(deserializer);
+    var var_originalBytes = sse_decode_CastedPrimitive_u_64(deserializer);
+    var var_skipped = sse_decode_u_32(deserializer);
+    return StrippedPdf(
+      pdf: var_pdf,
+      images: var_images,
+      pageCount: var_pageCount,
+      originalBytes: var_originalBytes,
+      skipped: var_skipped,
+    );
+  }
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint32();
   }
 
   @protected
@@ -1031,6 +919,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int sse_decode_i_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getInt32();
+  }
+
+  @protected
   void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNativeVectorIndex(
     NativeVectorIndex self,
@@ -1054,12 +948,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       (self as NativeVectorIndexImpl).frbInternalSseEncode(move: false),
       serializer,
     );
-  }
-
-  @protected
-  void sse_encode_CastedPrimitive_i_64(int self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_i_64(sseEncodeCastedPrimitiveI64(self), serializer);
   }
 
   @protected
@@ -1100,21 +988,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_extracted_image(
+    ExtractedImage self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.page, serializer);
+    sse_encode_u_32(self.indexOnPage, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_u_32(self.width, serializer);
+    sse_encode_u_32(self.height, serializer);
+    sse_encode_String(self.mediaType, serializer);
+    sse_encode_list_prim_u_8_strict(self.bytes, serializer);
+  }
+
+  @protected
   void sse_encode_f_32(double self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putFloat32(self);
-  }
-
-  @protected
-  void sse_encode_i_32(int self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putInt32(self);
-  }
-
-  @protected
-  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putPlatformInt64(self);
   }
 
   @protected
@@ -1126,6 +1017,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_CastedPrimitive_u_64(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_extracted_image(
+    List<ExtractedImage> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_extracted_image(item, serializer);
     }
   }
 
@@ -1152,16 +1055,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_list_prim_i_32_strict(
-    Int32List self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_i_32(self.length, serializer);
-    serializer.buffer.putInt32List(self);
-  }
-
-  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -1169,18 +1062,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     serializer.buffer.putUint8List(self);
-  }
-
-  @protected
-  void sse_encode_list_rust_paper_chunk(
-    List<RustPaperChunk> self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_i_32(self.length, serializer);
-    for (final item in self) {
-      sse_encode_rust_paper_chunk(item, serializer);
-    }
   }
 
   @protected
@@ -1192,16 +1073,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_rust_search_result(item, serializer);
-    }
-  }
-
-  @protected
-  void sse_encode_opt_String(String? self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    sse_encode_bool(self != null, serializer);
-    if (self != null) {
-      sse_encode_String(self, serializer);
     }
   }
 
@@ -1219,36 +1090,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_rust_paper_chunk(
-    RustPaperChunk self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.id, serializer);
-    sse_encode_CastedPrimitive_i_64(self.vectorId, serializer);
-    sse_encode_i_32(self.page, serializer);
-    sse_encode_i_32(self.ordinal, serializer);
-    sse_encode_String(self.section, serializer);
-    sse_encode_i_32(self.startChar, serializer);
-    sse_encode_i_32(self.endChar, serializer);
-    sse_encode_String(self.text, serializer);
-  }
-
-  @protected
-  void sse_encode_rust_pdf_processed_result(
-    RustPdfProcessedResult self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.title, serializer);
-    sse_encode_i_32(self.pageCount, serializer);
-    sse_encode_list_rust_paper_chunk(self.chunks, serializer);
-    sse_encode_list_prim_i_32_strict(self.emptyPages, serializer);
-    sse_encode_String(self.pdfType, serializer);
-    sse_encode_list_prim_i_32_strict(self.needsOcrPages, serializer);
-  }
-
-  @protected
   void sse_encode_rust_search_result(
     RustSearchResult self,
     SseSerializer serializer,
@@ -1256,6 +1097,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_CastedPrimitive_u_64(self.vectorId, serializer);
     sse_encode_f_32(self.score, serializer);
+  }
+
+  @protected
+  void sse_encode_stripped_pdf(StrippedPdf self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_prim_u_8_strict(self.pdf, serializer);
+    sse_encode_list_extracted_image(self.images, serializer);
+    sse_encode_u_32(self.pageCount, serializer);
+    sse_encode_CastedPrimitive_u_64(self.originalBytes, serializer);
+    sse_encode_u_32(self.skipped, serializer);
+  }
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint32(self);
   }
 
   @protected
@@ -1279,6 +1136,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_usize(BigInt self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putBigUint64(self);
+  }
+
+  @protected
+  void sse_encode_i_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putInt32(self);
   }
 }
 

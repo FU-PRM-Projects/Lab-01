@@ -7,6 +7,7 @@ import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/chat.dart';
 import 'package:lab_05/data/models/citation.dart';
 import 'package:lab_05/ui/chat/chat_controller.dart';
+import 'package:lab_05/ui/chat/tool_call_log.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -322,6 +323,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       ),
                     )
                   else ...[
+                    // What the agent did before answering
+                    if (msg.toolCalls.isNotEmpty)
+                      ToolCallLog(calls: msg.toolCalls),
+
                     // Assistant Markdown Content with Clickable Citations
                     _buildAssistantMarkdown(
                       context,
@@ -569,6 +574,9 @@ class _StreamingMessageBubble extends ConsumerWidget {
     final sources = ref.watch(
       chatControllerProvider.select((s) => s.streamingSources.values.toList()),
     );
+    final toolCalls = ref.watch(
+      chatControllerProvider.select((s) => s.toolCalls),
+    );
 
     ref.listen(chatControllerProvider.select((s) => s.streamingText), (
       prev,
@@ -606,6 +614,7 @@ class _StreamingMessageBubble extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (toolCalls.isNotEmpty) ToolCallLog(calls: toolCalls),
                   if (statusMessage != null && text.isEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),

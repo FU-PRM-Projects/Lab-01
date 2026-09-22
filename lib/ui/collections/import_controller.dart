@@ -35,7 +35,9 @@ class ImportController extends StateNotifier<(String, double)?> {
     } finally {
       embeddings.close();
       if (mounted) {
-        await _ref.read(papersProvider.notifier).refresh();
+        await _ref
+            .read(projectPapersProvider(collection.id).notifier)
+            .refresh();
         if (mounted) state = null;
       }
     }

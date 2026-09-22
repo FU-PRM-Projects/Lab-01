@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lab_05/app/providers.dart';
+import 'package:lab_05/ui/artifacts/artifact_controller.dart';
+import 'package:lab_05/ui/artifacts/artifact_panel.dart';
 import 'package:lab_05/ui/chat/chat_controller.dart';
 import 'package:lab_05/ui/chat/chat_page.dart';
 import 'package:lab_05/ui/chat/composer.dart';
@@ -78,6 +80,10 @@ class _AppShellState extends ConsumerState<AppShell> {
           .import(collection, sourceFile);
 
       if (mounted) {
+        // The imported PDF lands in this chat's artifact sidebar.
+        ref
+            .read(artifactPanelProvider.notifier)
+            .open(ref.read(artifactScopeProvider));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -153,6 +159,8 @@ class _AppShellState extends ConsumerState<AppShell> {
     final papers = ref.watch(papersProvider);
     final activeCitation = ref.watch(activeCitationProvider);
     final importProgress = ref.watch(importControllerProvider);
+    final artifactScope = ref.watch(artifactScopeProvider);
+    final artifactView = ref.watch(artifactViewProvider);
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -251,6 +259,34 @@ class _AppShellState extends ConsumerState<AppShell> {
                           ),
                         ),
                       const SizedBox(width: 8),
+
+                      // Per-chat artifact sidebar toggle
+                      if (collection != null)
+                        IconButton(
+                          icon: Badge(
+                            isLabelVisible: papers.isNotEmpty,
+                            label: Text('${papers.length}'),
+                            child: Icon(
+                              artifactView.isOpen
+                                  ? Icons.inventory_2
+                                  : Icons.inventory_2_outlined,
+                              size: 19,
+                              color: artifactView.isOpen
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          tooltip: artifactView.isOpen
+                              ? 'Hide artifacts'
+                              : 'Show artifacts',
+                          onPressed: () {
+                            ref.read(activeCitationProvider.notifier).state =
+                                null;
+                            ref
+                                .read(artifactPanelProvider.notifier)
+                                .toggle(artifactScope);
+                          },
+                        ),
 
                       // Quick Theme Switcher Button
                       IconButton(
@@ -365,20 +401,26 @@ class _AppShellState extends ConsumerState<AppShell> {
             ),
           ),
 
-          // Side-by-side Source Inspection & PDF Panel
+          // Right dock: this chat's artifacts, or the source inspector while a
+          // citation is open. Closing the citation returns to the artifacts.
           AnimatedSize(
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOutCubic,
             alignment: Alignment.centerRight,
-            child: activeCitation == null
-                ? const SizedBox.shrink()
-                : SourcePanel(
+            child: activeCitation != null
+                ? SourcePanel(
                     key: ValueKey(activeCitation.chunkId),
                     citation: activeCitation,
                     onClose: () {
                       ref.read(activeCitationProvider.notifier).state = null;
                     },
-                  ),
+                  )
+                : artifactView.isOpen && collection != null
+                ? ArtifactPanel(
+                    key: ValueKey(artifactScope),
+                    onImportPaper: _pickAndImportPaper,
+                  )
+                : const SizedBox.shrink(),
           ),
         ],
       ),
