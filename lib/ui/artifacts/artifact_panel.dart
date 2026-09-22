@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -11,6 +12,7 @@ import 'package:lab_05/data/models/document_section.dart';
 import 'package:lab_05/data/models/reference.dart';
 import 'package:lab_05/ui/artifacts/artifact_controller.dart';
 import 'package:lab_05/ui/collections/import_controller.dart';
+import 'package:lab_05/ui/core/markdown_math.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
 /// Per-chat sidebar listing the PDFs of the collection. Selecting one shows
@@ -835,13 +837,12 @@ class _SectionRowState extends State<_SectionRow> {
                 left: BorderSide(color: colorScheme.outlineVariant, width: 1),
               ),
             ),
-            child: SelectableText(
-              section.text.trim(),
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface,
-                fontSize: 12.5,
-                height: 1.6,
-              ),
+            child: MarkdownBody(
+              data: section.text.trim(),
+              selectable: true,
+              styleSheet: _sectionMarkdownStyle(context),
+              inlineSyntaxes: mathInlineSyntaxes,
+              builders: mathBuilders,
             ),
           ),
           crossFadeState: _expanded
@@ -859,6 +860,33 @@ class _SectionRowState extends State<_SectionRow> {
       ],
     );
   }
+}
+
+/// Styling for a section's expanded body text: matches the plain-text
+/// look the SelectableText it replaced had, but lets Markdown headings,
+/// emphasis, and (via mathInlineSyntaxes/mathBuilders) LaTeX formulas
+/// render instead of showing up as raw source.
+MarkdownStyleSheet _sectionMarkdownStyle(BuildContext context) {
+  final colorScheme = context.colorScheme;
+  final base = context.textTheme.bodySmall?.copyWith(
+    color: colorScheme.onSurface,
+    fontSize: 12.5,
+    height: 1.6,
+  );
+  return MarkdownStyleSheet(
+    p: base,
+    listBullet: base,
+    strong: base?.copyWith(fontWeight: FontWeight.w700),
+    em: base?.copyWith(fontStyle: FontStyle.italic),
+    h1: base?.copyWith(fontSize: 14, fontWeight: FontWeight.w700),
+    h2: base?.copyWith(fontSize: 13.5, fontWeight: FontWeight.w700),
+    h3: base?.copyWith(fontSize: 13, fontWeight: FontWeight.w600),
+    code: base?.copyWith(
+      fontFamily: 'Consolas',
+      backgroundColor: colorScheme.surfaceContainerHighest,
+    ),
+    blockquote: base?.copyWith(color: colorScheme.onSurfaceVariant),
+  );
 }
 
 /// A [Citation] pointing at a whole section, so opening one lands on the page

@@ -8,6 +8,7 @@ import 'package:lab_05/data/models/chat.dart';
 import 'package:lab_05/data/models/citation.dart';
 import 'package:lab_05/ui/chat/chat_controller.dart';
 import 'package:lab_05/ui/chat/tool_call_log.dart';
+import 'package:lab_05/ui/core/markdown_math.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -462,6 +463,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       data: content,
       selectable: false,
       styleSheet: createMarkdownStyle(context),
+      inlineSyntaxes: mathInlineSyntaxes,
+      builders: mathBuilders,
       onTapLink: (text, href, title) {
         if (href != null && citationMap.containsKey(href)) {
           _openCitation(citationMap[href]!);
@@ -646,6 +649,8 @@ class _StreamingMessageBubble extends ConsumerWidget {
                       data: text,
                       selectable: false,
                       styleSheet: _ChatPageState.createMarkdownStyle(context),
+                      inlineSyntaxes: mathInlineSyntaxes,
+                      builders: mathBuilders,
                       onTapLink: (t, href, title) {
                         if (href != null && citationMap.containsKey(href)) {
                           onCitationTap(citationMap[href]!);
