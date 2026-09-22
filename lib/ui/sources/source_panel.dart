@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/citation.dart';
+import 'package:lab_05/ui/core/markdown_math.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
 class SourcePanel extends ConsumerStatefulWidget {
@@ -303,8 +304,15 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
                           data: _cleanMarkdown(widget.citation.excerpt),
                           selectable: false,
                           styleSheet: _buildMarkdownStyle(context),
-                          inlineSyntaxes: [_UnderlineSyntax()],
-                          builders: {'u': _UnderlineBuilder()},
+                          blockSyntaxes: mathBlockSyntaxes,
+                          inlineSyntaxes: [
+                            ...mathInlineSyntaxes,
+                            _UnderlineSyntax(),
+                          ],
+                          builders: {
+                            ...mathBuilders,
+                            'u': _UnderlineBuilder(),
+                          },
                           onTapLink: (text, href, title) {
                             if (href != null) {
                               final uri = Uri.tryParse(href);

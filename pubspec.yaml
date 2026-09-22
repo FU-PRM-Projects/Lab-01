@@ -12,6 +12,7 @@ dependencies:
   crypto: ^3.0.7
   file_picker: ^13.0.0
   flutter_markdown_plus: ^1.0.12
+  flutter_math_fork: ^0.7.4
   flutter_riverpod: ^3.4.3
   http: ^1.6.0
   lab_05_rust:
