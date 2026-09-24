@@ -39,6 +39,23 @@ class _AppShellState extends ConsumerState<AppShell> {
       return;
     }
 
+    // A folder holds exactly one paper; another paper needs its own folder.
+    if (!ref.read(canImportPaperProvider)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'This folder already has its paper. '
+            'Create a new folder to import another one.',
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
+
     final apiKey = ref.read(apiKeyProvider);
     if (apiKey.trim().isEmpty) {
       showDialog<void>(
@@ -239,26 +256,6 @@ class _AppShellState extends ConsumerState<AppShell> {
                         ),
                       ],
                       const Spacer(),
-                      if (collection != null)
-                        OutlinedButton.icon(
-                          onPressed: _pickAndImportPaper,
-                          icon: const Icon(
-                            Icons.upload_file_outlined,
-                            size: 16,
-                          ),
-                          label: const Text('Add source'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ),
-                      const SizedBox(width: 8),
 
                       // Per-chat artifact sidebar toggle
                       if (collection != null)
@@ -396,7 +393,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                 Expanded(child: ChatPage(onImportPaper: _pickAndImportPaper)),
 
                 // Material 3 Floating Composer
-                CodexComposer(onImportPaper: _pickAndImportPaper),
+                const CodexComposer(),
               ],
             ),
           ),

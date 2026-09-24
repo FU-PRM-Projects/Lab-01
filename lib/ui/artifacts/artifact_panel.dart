@@ -246,32 +246,37 @@ class _PaperList extends ConsumerWidget {
     final papers = ref.watch(papersProvider);
     final citedChunkIds = ref.watch(citedChunkIdsProvider);
     final importProgress = ref.watch(importControllerProvider);
+    // One paper per folder: the upload button exists only while the folder
+    // is still empty (or its only import failed).
+    final canImport = ref.watch(canImportPaperProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-          child: FilledButton.tonalIcon(
-            onPressed: importProgress != null ? null : onImportPaper,
-            icon: const Icon(Icons.upload_file_outlined, size: 17),
-            label: Text(importProgress != null ? 'Importing…' : 'Upload PDF'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+        if (canImport || importProgress != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+            child: FilledButton.tonalIcon(
+              onPressed: importProgress != null ? null : onImportPaper,
+              icon: const Icon(Icons.upload_file_outlined, size: 17),
+              label: Text(importProgress != null ? 'Importing…' : 'Upload PDF'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
-        ),
         Expanded(
           child: papers.isEmpty
               ? _EmptyHint(
                   icon: Icons.picture_as_pdf_outlined,
-                  title: 'No PDFs yet',
+                  title: 'No paper yet',
                   message:
-                      'Upload a research paper and it will show up here with '
-                      'its indexed chunks and the works it cites.',
+                      'Each folder holds one research paper. Upload it and it '
+                      'will show up here with its indexed chunks and the '
+                      'works it cites.',
                 )
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
