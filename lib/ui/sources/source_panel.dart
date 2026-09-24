@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -10,9 +12,15 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/citation.dart';
+import 'package:lab_05/data/models/paper.dart';
+import 'package:lab_05/ui/artifacts/artifact_controller.dart';
 import 'package:lab_05/ui/core/markdown_math.dart';
 import 'package:lab_05/ui/core/snackbar.dart';
 import 'package:lab_05/ui/core/theme.dart';
+
+/// Which body the panel shows. A figure citation defaults to [figure]; a text
+/// citation only ever has [excerpt] and [pdf].
+enum _PanelView { figure, excerpt, pdf }
 
 class SourcePanel extends ConsumerStatefulWidget {
   final Citation citation;
@@ -25,7 +33,7 @@ class SourcePanel extends ConsumerStatefulWidget {
 }
 
 class _SourcePanelState extends ConsumerState<SourcePanel> {
-  bool _showPdfView = false;
+  _PanelView _view = _PanelView.excerpt;
   bool _renderMarkdown = true;
   PdfViewerController? _pdfController;
 
@@ -33,6 +41,22 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
   void initState() {
     super.initState();
     _pdfController = PdfViewerController();
+    _view = _defaultViewFor(widget.citation);
+  }
+
+  /// A figure citation opens straight on its image; a text citation opens on
+  /// the excerpt, same as before this feature existed.
+  _PanelView _defaultViewFor(Citation citation) {
+    final chunk = _chunkFor(citation);
+    return (chunk?.isFigure ?? false) ? _PanelView.figure : _PanelView.excerpt;
+  }
+
+  PaperChunk? _chunkFor(Citation citation) {
+    final chunks = ref.read(paperChunksProvider(citation.documentId));
+    for (final chunk in chunks) {
+      if (chunk.id == citation.chunkId) return chunk;
+    }
+    return null;
   }
 
   @override
@@ -40,9 +64,15 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.citation.page != widget.citation.page ||
         oldWidget.citation.documentId != widget.citation.documentId) {
-      if (_showPdfView) {
+      if (_view == _PanelView.pdf) {
         _pdfController?.goToPage(pageNumber: widget.citation.page);
       }
+    }
+    // A different citation resets to its own default view, so switching from
+    // a figure to a text passage does not leave the panel stuck showing an
+    // "Excerpt" tab with nothing under it, or vice versa.
+    if (oldWidget.citation.chunkId != widget.citation.chunkId) {
+      _view = _defaultViewFor(widget.citation);
     }
   }
 
@@ -59,13 +89,31 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
 
     final collection = ref.watch(currentCollectionProvider);
     final storage = ref.watch(localStorageProvider);
+    final chunk = _chunkFor(widget.citation);
+    final isFigure = chunk?.isFigure ?? false;
 
     String? pdfPath;
     bool pdfExists = false;
+    String? figurePath;
+    bool figureExists = false;
     if (collection != null) {
       pdfPath = storage.paperPdfPath(collection.id, widget.citation.documentId);
       pdfExists = File(pdfPath).existsSync();
+      if (isFigure) {
+        figurePath = storage.figurePath(
+          collection.id,
+          widget.citation.documentId,
+          chunk!.imagePath!,
+        );
+        figureExists = File(figurePath).existsSync();
+      }
     }
+
+    // A figure whose file went missing has nothing to show as a figure, so
+    // the panel falls back to the excerpt body rather than a blank pane.
+    final effectiveView = (_view == _PanelView.figure && !figureExists)
+        ? _PanelView.excerpt
+        : _view;
 
     return Container(
       width: 500,
@@ -119,6 +167,16 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if (figureExists)
+                  IconButton(
+                    icon: Icon(
+                      Icons.download_outlined,
+                      size: 18,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    tooltip: 'Export image',
+                    onPressed: () => _exportFigure(context, figurePath!),
+                  ),
                 IconButton(
                   icon: Icon(
                     Icons.close,
@@ -152,24 +210,31 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
                   ),
                 ],
                 const Spacer(),
-                if (pdfExists)
-                  SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment<bool>(
-                        value: false,
+                if (figureExists || pdfExists)
+                  SegmentedButton<_PanelView>(
+                    segments: [
+                      if (figureExists)
+                        const ButtonSegment<_PanelView>(
+                          value: _PanelView.figure,
+                          label: Text('Figure'),
+                          icon: Icon(Icons.image_outlined, size: 14),
+                        ),
+                      const ButtonSegment<_PanelView>(
+                        value: _PanelView.excerpt,
                         label: Text('Excerpt'),
                         icon: Icon(Icons.notes, size: 14),
                       ),
-                      ButtonSegment<bool>(
-                        value: true,
-                        label: Text('PDF'),
-                        icon: Icon(Icons.picture_as_pdf_outlined, size: 14),
-                      ),
+                      if (pdfExists)
+                        const ButtonSegment<_PanelView>(
+                          value: _PanelView.pdf,
+                          label: Text('PDF'),
+                          icon: Icon(Icons.picture_as_pdf_outlined, size: 14),
+                        ),
                     ],
-                    selected: {_showPdfView},
-                    onSelectionChanged: (Set<bool> selected) {
+                    selected: {effectiveView},
+                    onSelectionChanged: (Set<_PanelView> selected) {
                       setState(() {
-                        _showPdfView = selected.first;
+                        _view = selected.first;
                       });
                     },
                     style: SegmentedButton.styleFrom(
@@ -181,12 +246,102 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
             ),
           ),
 
-          // Body: Excerpt or PDF Viewer
+          // Body: Figure, Excerpt or PDF Viewer
           Expanded(
-            child: _showPdfView && pdfExists && pdfPath != null
-                ? _buildPdfViewer(pdfPath)
-                : _buildExcerptView(context, pdfExists),
+            child: switch (effectiveView) {
+              _PanelView.figure when figureExists =>
+                _buildFigureView(context, figurePath!),
+              _PanelView.pdf when pdfExists && pdfPath != null =>
+                _buildPdfViewer(pdfPath),
+              _ => _buildExcerptView(context, pdfExists),
+            },
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Writes [figurePath]'s bytes wherever the person chooses via the native
+  /// save-as dialog. Mirrors the PDF-import flow's use of [FilePicker] in
+  /// `app_shell.dart`, just for saving instead of picking.
+  Future<void> _exportFigure(BuildContext context, String figurePath) async {
+    final Uint8List bytes;
+    try {
+      bytes = await File(figurePath).readAsBytes();
+    } catch (e) {
+      if (context.mounted) {
+        showAppSnackBar(context, 'Could not read the figure file: $e');
+      }
+      return;
+    }
+
+    final extension = figurePath.contains('.')
+        ? figurePath.substring(figurePath.lastIndexOf('.') + 1)
+        : 'png';
+    final suggestedName =
+        '${widget.citation.sourceId}_p${widget.citation.page}.$extension';
+
+    try {
+      final saved = await FilePicker.saveFile(
+        dialogTitle: 'Export figure image',
+        fileName: suggestedName,
+        bytes: bytes,
+      );
+      if (saved != null && context.mounted) {
+        showAppSnackBar(context, 'Saved $suggestedName', isSuccess: true);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showAppSnackBar(context, 'Could not save the image: $e');
+      }
+    }
+  }
+
+  Widget _buildFigureView(BuildContext context, String figurePath) {
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: colorScheme.outlineVariant),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4,
+                child: Center(
+                  child: Image.file(File(figurePath), fit: BoxFit.contain),
+                ),
+              ),
+            ),
+          ),
+          if (widget.citation.excerpt.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colorScheme.outlineVariant),
+              ),
+              child: Text(
+                widget.citation.excerpt,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -355,7 +510,7 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
             FilledButton.tonalIcon(
               onPressed: () {
                 setState(() {
-                  _showPdfView = true;
+                  _view = _PanelView.pdf;
                 });
               },
               icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
