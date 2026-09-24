@@ -8,6 +8,7 @@ import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/ui/artifacts/artifact_controller.dart';
 import 'package:lab_05/ui/chat/chat_controller.dart';
 import 'package:lab_05/ui/collections/import_controller.dart';
+import 'package:lab_05/ui/core/snackbar.dart';
 import 'package:lab_05/ui/core/theme.dart';
 import 'package:lab_05/ui/settings/settings_dialog.dart';
 
@@ -31,14 +32,9 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
   String? _hoveredChatId;
   bool _isFooterHovered = false;
 
-  void _toggleTheme() {
-    final settings = ref.read(settingsProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final nextTheme = isDark ? 'light' : 'dark';
-    ref
-        .read(settingsProvider.notifier)
-        .update(settings.copyWith(theme: nextTheme));
-  }
+  void _toggleTheme() => ref
+      .read(settingsProvider.notifier)
+      .toggleTheme(Theme.of(context).brightness);
 
   Future<void> _selectCollection(Collection collection) async {
     await ref.read(chatControllerProvider.notifier).stop();
@@ -69,8 +65,10 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
           .update(settings.copyWith(pinnedCollectionIds: pinnedIds.toList()));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update pinned projects: $error')),
+      showAppSnackBar(
+        context,
+        'Could not update pinned projects: $error',
+        isError: true,
       );
     }
   }

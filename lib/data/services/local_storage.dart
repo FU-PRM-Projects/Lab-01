@@ -382,19 +382,6 @@ class LocalStorage {
   }
 
   // Index state
-  Future<IndexState> loadIndexState(
-    String collectionId, {
-    required String embeddingProfileId,
-  }) async {
-    final json = await readJsonSafely(indexStatePath(collectionId));
-    if (json == null) {
-      final defaultState = IndexState(embeddingProfileId: embeddingProfileId);
-      await saveIndexState(collectionId, defaultState);
-      return defaultState;
-    }
-    return IndexState.fromJson(json);
-  }
-
   Future<void> saveIndexState(String collectionId, IndexState state) async {
     await writeJsonSafely(indexStatePath(collectionId), state.toJson());
   }

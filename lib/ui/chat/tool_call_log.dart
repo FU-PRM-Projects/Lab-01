@@ -282,17 +282,15 @@ TextStyle mutedLineStyle(BuildContext context) {
 String toolLabel(ToolCallRecord call) {
   final running = call.isRunning;
   final query = call.arguments['query'];
-  final document = call.arguments['documentId'];
   final page = call.arguments['page'];
 
   return switch (call.name) {
     'search_papers' when query is String && query.isNotEmpty =>
-      '${running ? 'Searching' : 'Searched'} papers for "$query"',
-    'search_papers' => running ? 'Searching papers' : 'Searched papers',
+      '${running ? 'Searching' : 'Searched'} the paper for "$query"',
+    'search_papers' => running ? 'Searching the paper' : 'Searched the paper',
     'read_page' when page != null =>
-      '${running ? 'Reading' : 'Read'} page $page of ${document ?? 'a paper'}',
+      '${running ? 'Reading' : 'Read'} page $page of the paper',
     'read_page' => running ? 'Reading a page' : 'Read a page',
-    'list_papers' => running ? 'Listing papers' : 'Listed the papers',
     _ => running ? 'Running ${call.name}' : 'Ran ${call.name}',
   };
 }

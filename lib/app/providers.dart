@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show Brightness;
 
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
@@ -6,7 +7,6 @@ import 'package:lab_05/data/models/app_settings.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
-import 'package:lab_05/data/services/collection_index.dart';
 import 'package:lab_05/data/repositories/paper_repository.dart';
 import 'package:lab_05/data/models/chat.dart';
 import 'package:lab_05/data/models/citation.dart';
@@ -88,6 +88,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       rethrow;
     }
   }
+
+  /// Flips between light and dark, starting from the brightness on screen
+  /// (which may come from the system theme rather than a saved choice).
+  Future<void> toggleTheme(Brightness onScreen) => update(
+    state.copyWith(theme: onScreen == Brightness.dark ? 'light' : 'dark'),
+  );
 }
 
 final settingsProvider = StateNotifierProvider<SettingsNotifier, AppSettings>((
@@ -187,18 +193,6 @@ class PapersNotifier extends StateNotifier<List<PaperDocument>> {
     if (mounted) state = List.unmodifiable(papers);
   }
 
-  Future<void> removePaper(
-    String documentId,
-    List<int> vectorIds,
-    CollectionIndex index,
-  ) async {
-    if (_collectionId == null) return;
-    await index.removeVectors(vectorIds);
-    await index.save(_storage.indexVectorsPath(_collectionId));
-    await _storage.deletePaper(_collectionId, documentId);
-    await refresh();
-  }
-
   Future<void> deletePaper(
     String documentId,
     PaperRepository repository,
@@ -277,12 +271,6 @@ final projectChatsProvider =
       final storage = ref.watch(localStorageProvider);
       return ChatsNotifier(storage, collectionId);
     });
-
-final chatsProvider = Provider<List<Chat>>((ref) {
-  final currentCol = ref.watch(currentCollectionProvider);
-  if (currentCol == null) return const [];
-  return ref.watch(projectChatsProvider(currentCol.id));
-});
 
 // Current Active Chat Provider
 final currentChatProvider = StateProvider<Chat?>((ref) => null);

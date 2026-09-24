@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/app_settings.dart';
 import 'package:lab_05/data/services/local_storage.dart';
+import 'package:lab_05/ui/core/snackbar.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
 class SettingsDialog extends ConsumerStatefulWidget {
@@ -145,8 +146,10 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _selectedTheme = previousTheme);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not change appearance: $error')),
+      showAppSnackBar(
+        context,
+        'Could not change appearance: $error',
+        isError: true,
       );
     }
   }
@@ -406,25 +409,17 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                                     .read(dataDirectoryControllerProvider)
                                     .resetToDefault();
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Reset to default data directory',
-                                      ),
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
+                                  showAppSnackBar(
+                                    context,
+                                    'Reset to default data directory',
                                   );
                                 }
                               } catch (e) {
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Failed to reset directory: $e',
-                                      ),
-                                      backgroundColor: colorScheme.error,
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
+                                  showAppSnackBar(
+                                    context,
+                                    'Failed to reset directory: $e',
+                                    isError: true,
                                   );
                                 }
                               }
@@ -476,25 +471,17 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                                       .read(dataDirectoryControllerProvider)
                                       .changeDirectory(Directory(selectedPath));
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Data directory updated: $selectedPath',
-                                        ),
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
+                                    showAppSnackBar(
+                                      context,
+                                      'Data directory updated: $selectedPath',
                                     );
                                   }
                                 } catch (e) {
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Failed to change directory: $e',
-                                        ),
-                                        backgroundColor: colorScheme.error,
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
+                                    showAppSnackBar(
+                                      context,
+                                      'Failed to change directory: $e',
+                                      isError: true,
                                     );
                                   }
                                 }
@@ -513,18 +500,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                               Clipboard.setData(
                                 ClipboardData(text: storage.rootDir.path),
                               );
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text(
-                                    'Path copied to clipboard',
-                                  ),
-                                  behavior: SnackBarBehavior.floating,
-                                  duration: const Duration(seconds: 1),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              );
+                              showCopiedSnackBar(context, 'Path');
                             },
                           ),
                         ],
@@ -575,11 +551,10 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                       if (context.mounted) Navigator.of(context).pop();
                     } catch (error) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Could not save settings: $error'),
-                            backgroundColor: colorScheme.error,
-                          ),
+                        showAppSnackBar(
+                          context,
+                          'Could not save settings: $error',
+                          isError: true,
                         );
                       }
                     }

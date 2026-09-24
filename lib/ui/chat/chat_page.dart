@@ -10,6 +10,7 @@ import 'package:lab_05/ui/chat/chat_controller.dart';
 import 'package:lab_05/ui/chat/tool_call_log.dart';
 import 'package:lab_05/ui/collections/import_controller.dart';
 import 'package:lab_05/ui/core/markdown_math.dart';
+import 'package:lab_05/ui/core/snackbar.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -75,23 +76,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final isStreaming = ref.watch(
       chatControllerProvider.select((s) => s.isStreaming),
     );
-    final colorScheme = context.colorScheme;
 
     ref.listen(chatControllerProvider.select((s) => s.errorMessage), (
       prev,
       next,
     ) {
       if (next != null && next.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next),
-            backgroundColor: colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
+        showAppSnackBar(context, next, isError: true);
       }
     });
 
@@ -383,18 +374,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                               Clipboard.setData(
                                 ClipboardData(text: msg.content),
                               );
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text(
-                                    'Response copied to clipboard',
-                                  ),
-                                  behavior: SnackBarBehavior.floating,
-                                  duration: const Duration(seconds: 1),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              );
+                              showCopiedSnackBar(context, 'Response');
                             },
                           ),
                           const SizedBox(width: 8),
@@ -484,13 +464,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   ) {
     final citationMap = {for (final c in citations) c.sourceId: c};
 
-    return MarkdownBody(
+    return MathMarkdown(
       data: content,
-      selectable: false,
       styleSheet: createMarkdownStyle(context),
-      blockSyntaxes: mathBlockSyntaxes,
-      inlineSyntaxes: mathInlineSyntaxes,
-      builders: mathBuilders,
       onTapLink: (text, href, title) {
         if (href != null && citationMap.containsKey(href)) {
           _openCitation(citationMap[href]!);
@@ -671,13 +647,9 @@ class _StreamingMessageBubble extends ConsumerWidget {
                       ),
                     ),
                   if (text.isNotEmpty)
-                    MarkdownBody(
+                    MathMarkdown(
                       data: text,
-                      selectable: false,
                       styleSheet: _ChatPageState.createMarkdownStyle(context),
-                      blockSyntaxes: mathBlockSyntaxes,
-                      inlineSyntaxes: mathInlineSyntaxes,
-                      builders: mathBuilders,
                       onTapLink: (t, href, title) {
                         if (href != null && citationMap.containsKey(href)) {
                           onCitationTap(citationMap[href]!);
