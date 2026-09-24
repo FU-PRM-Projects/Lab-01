@@ -11,6 +11,7 @@ import 'package:lab_05/data/services/crossref_client.dart';
 import 'package:lab_05/data/models/document_section.dart';
 import 'package:lab_05/data/models/reference.dart';
 import 'package:lab_05/ui/artifacts/artifact_controller.dart';
+import 'package:lab_05/ui/chat/chat_controller.dart';
 import 'package:lab_05/ui/collections/import_controller.dart';
 import 'package:lab_05/ui/core/markdown_math.dart';
 import 'package:lab_05/ui/core/theme.dart';
@@ -486,8 +487,18 @@ class _PaperDetail extends ConsumerWidget {
     final colorScheme = context.colorScheme;
     final textTheme = context.textTheme;
 
-    final sections = ref.watch(paperSectionsProvider(paper.id));
-    final chunks = ref.watch(paperChunksProvider(paper.id));
+    final activeRevision = ref.watch(activeRevisionProvider(paper.id)).value;
+    final originalSections = ref.watch(paperSectionsProvider(paper.id));
+    final originalChunks = ref.watch(paperChunksProvider(paper.id));
+    final sections = activeRevision == null
+        ? originalSections
+        : activeRevision.sections;
+    final chunks = activeRevision != null && activeRevision.chunks.isNotEmpty
+        ? [
+            ...activeRevision.chunks,
+            ...paper.chunks.where((chunk) => chunk.isFigure),
+          ]
+        : originalChunks;
     final references = ref.watch(paperReferencesProvider(paper.id));
 
     return DefaultTabController(
@@ -521,6 +532,11 @@ class _PaperDetail extends ConsumerWidget {
                   onTap: chunks.isEmpty
                       ? null
                       : () => _openCitation(ref, chunks.first),
+                ),
+                const SizedBox(width: 2),
+                _SectionExportAction(
+                  enabled: sections.isNotEmpty,
+                  onSelected: (choice) => _exportSections(context, ref, choice),
                 ),
                 const Spacer(),
                 _BarAction(
@@ -591,6 +607,104 @@ class _PaperDetail extends ConsumerWidget {
     ref.read(activeCitationProvider.notifier).state = citationForChunk(
       paper,
       chunk,
+    );
+  }
+
+  Future<void> _exportSections(
+    BuildContext context,
+    WidgetRef ref,
+    _SectionExportChoice choice,
+  ) async {
+    if (ref.read(currentCollectionProvider) == null) return;
+
+    try {
+      await ref
+          .read(chatControllerProvider.notifier)
+          .exportSectionsFromPanel(paper, format: choice.name);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Export review created in chat'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not export sections: $error'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+}
+
+enum _SectionExportChoice { markdown, json, both }
+
+class _SectionExportAction extends StatelessWidget {
+  final bool enabled;
+  final ValueChanged<_SectionExportChoice> onSelected;
+
+  const _SectionExportAction({required this.enabled, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = context.colorScheme.onSurfaceVariant;
+    return PopupMenuButton<_SectionExportChoice>(
+      enabled: enabled,
+      tooltip: enabled ? 'Export sections' : 'No sections to export',
+      onSelected: onSelected,
+      itemBuilder: (_) => const [
+        PopupMenuItem(
+          value: _SectionExportChoice.markdown,
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.description_outlined, size: 17),
+            title: Text('Review Markdown'),
+          ),
+        ),
+        PopupMenuItem(
+          value: _SectionExportChoice.json,
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.data_object, size: 17),
+            title: Text('Review JSON'),
+          ),
+        ),
+        PopupMenuItem(
+          value: _SectionExportChoice.both,
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.folder_copy_outlined, size: 17),
+            title: Text('Review both'),
+          ),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.download_outlined, size: 15, color: color),
+            const SizedBox(width: 6),
+            Text(
+              'Export',
+              style: TextStyle(
+                color: enabled ? color : color.withValues(alpha: 0.38),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

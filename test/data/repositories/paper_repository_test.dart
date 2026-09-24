@@ -3,8 +3,11 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/collection.dart';
+import 'package:lab_05/data/models/document_section.dart';
 import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/data/repositories/paper_repository.dart';
+import 'package:lab_05/data/services/collection_index.dart';
+import 'package:lab_05/data/services/embedding_client.dart';
 import 'package:lab_05/data/services/local_storage.dart';
 
 void main() {
@@ -119,5 +122,143 @@ void main() {
       expect(notifier1.state.isEmpty, isTrue);
       expect(notifier2.state.length, equals(1)); // Project 2 untouched
     });
+
+    test(
+      'saving a draft indexes and activates a new immutable revision',
+      () async {
+        final collection = Collection(
+          id: 'col_revision',
+          name: 'Revision Test',
+          createdAt: DateTime.utc(2026),
+          embeddingProfile: const EmbeddingProfile(
+            id: 'profile',
+            dimensions: 4,
+          ),
+        );
+        await storage.saveCollection(collection);
+        final paper = PaperDocument(
+          id: 'doc_revision',
+          fileName: 'paper.pdf',
+          title: 'Paper',
+          sha256: 'hash',
+          pageCount: 1,
+          status: DocumentStatus.ready,
+          createdAt: DateTime.utc(2026),
+          embeddingProfileId: 'profile',
+          sections: const [
+            DocumentSection(
+              id: 'doc_revision:s0',
+              ordinal: 0,
+              name: 'Results',
+              kind: SectionKind.body,
+              startPage: 1,
+              endPage: 1,
+              startChar: 0,
+              endChar: 20,
+              text: '## Results\n\nOriginal.',
+            ),
+          ],
+          chunks: const [
+            PaperChunk(
+              id: 'doc_revision:s0:c0',
+              vectorId: 1,
+              page: 1,
+              ordinal: 0,
+              section: 'Results',
+              sectionId: 'doc_revision:s0',
+              startChar: 0,
+              endChar: 20,
+              text: '## Results\n\nOriginal.',
+            ),
+          ],
+        );
+        await storage.savePaper(collection.id, paper);
+        await storage.ensureOriginalRevision(collection.id, paper);
+        final draft = await storage.createPendingRevision(
+          collectionId: collection.id,
+          paper: paper,
+          sectionId: 'doc_revision:s0',
+          revisedContent: '## Results\n\nRevised and clearer.',
+          instruction: 'Clarify results',
+        );
+        final index = _FakeIndex();
+        final repository = _RevisionRepository(
+          storage: storage,
+          collectionId: collection.id,
+          index: index,
+        );
+
+        final result = await repository.saveDraftRevision(
+          documentId: paper.id,
+          revisionId: draft.id,
+          embeddings: _FakeEmbeddings(),
+        );
+
+        expect(result.revision.status, 'saved');
+        expect(result.revision.indexStatus, 'indexed');
+        expect(result.revision.chunks, isNotEmpty);
+        expect(index.added, result.revision.chunks.length);
+        expect(
+          (await storage.loadActiveRevision(collection.id, paper))!.id,
+          draft.id,
+        );
+        expect(await File(result.markdownPath).exists(), isTrue);
+
+        await repository.revertToRevision(
+          documentId: paper.id,
+          revisionId: 'rev_original',
+        );
+        expect(
+          (await storage.loadActiveRevision(collection.id, paper))!.id,
+          'rev_original',
+        );
+      },
+    );
   });
+}
+
+class _RevisionRepository extends PaperRepository {
+  final CollectionIndex index;
+
+  _RevisionRepository({
+    required super.storage,
+    required super.collectionId,
+    required this.index,
+  });
+
+  @override
+  Future<CollectionIndex> openIndex() async => index;
+}
+
+class _FakeIndex extends CollectionIndex {
+  int added = 0;
+
+  _FakeIndex() : super(dimensions: 4);
+
+  @override
+  bool get isOpen => true;
+
+  @override
+  int get length => added;
+
+  @override
+  Future<void> add(List<PaperChunk> chunks, List<List<double>> vectors) async {
+    expect(chunks.length, vectors.length);
+    added += chunks.length;
+  }
+
+  @override
+  Future<void> save([String? targetPath]) async {}
+}
+
+class _FakeEmbeddings extends EmbeddingClient {
+  _FakeEmbeddings() : super(apiKey: 'test', dimensions: 4);
+
+  @override
+  Future<List<List<double>>> embedTexts(
+    List<String> texts, {
+    int batchSize = 16,
+  }) async => [
+    for (final _ in texts) [1, 0, 0, 0],
+  ];
 }

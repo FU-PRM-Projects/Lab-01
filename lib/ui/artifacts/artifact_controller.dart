@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/legacy.dart';
 
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/paper.dart';
+import 'package:lab_05/data/models/section_revision.dart';
 import 'package:lab_05/data/services/crossref_client.dart';
 import 'package:lab_05/data/models/document_section.dart';
 import 'package:lab_05/data/models/reference.dart';
@@ -113,6 +114,18 @@ final paperByIdProvider = Provider.family<PaperDocument?, String>((
     if (paper.id == documentId) return paper;
   }
   return null;
+});
+
+final activeRevisionProvider = FutureProvider.family<SectionRevision?, String>((
+  ref,
+  documentId,
+) async {
+  final collection = ref.watch(currentCollectionProvider);
+  final paper = ref.watch(paperByIdProvider(documentId));
+  if (collection == null || paper == null) return null;
+  return ref
+      .watch(localStorageProvider)
+      .loadActiveRevision(collection.id, paper);
 });
 
 /// Chunks of one paper in reading order.

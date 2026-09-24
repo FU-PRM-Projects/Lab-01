@@ -9,7 +9,9 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:lab_05/data/models/app_settings.dart';
+import 'package:lab_05/data/models/document_section.dart';
 import 'package:lab_05/data/models/paper.dart';
+import 'package:lab_05/data/models/section_revision.dart';
 import 'package:lab_05/data/services/collection_index.dart';
 import 'package:lab_05/data/services/embedding_client.dart';
 import 'package:lab_05/data/services/indexing_pipeline.dart';
@@ -95,7 +97,13 @@ class PaperRepository {
       try {
         final collection = await storage.loadCollection(collectionId);
         final index = await openIndex();
-        final vectorIds = paper.chunks.map((c) => c.vectorId).toList();
+        final revisions = await storage.listRevisions(collectionId, documentId);
+        final vectorIds = {
+          ...paper.chunks.map((c) => c.vectorId),
+          ...revisions
+              .expand((revision) => revision.chunks)
+              .map((chunk) => chunk.vectorId),
+        }.where((id) => id > 0).toList();
         await index.removeVectors(vectorIds);
         await index.save(storage.indexVectorsPath(collectionId));
 
@@ -286,6 +294,7 @@ class PaperRepository {
       // 10. Mark paper as ready, index state as clean
       paperDoc = paperDoc.copyWith(status: DocumentStatus.ready);
       await storage.savePaper(collectionId, paperDoc);
+      await storage.ensureOriginalRevision(collectionId, paperDoc);
 
       await storage.saveIndexState(
         collectionId,
@@ -309,6 +318,189 @@ class PaperRepository {
       await storage.savePaper(collectionId, paperDoc);
       rethrow;
     }
+  }
+
+  Future<
+    ({
+      SectionRevision revision,
+      String artifactId,
+      String markdownPath,
+      String jsonPath,
+    })
+  >
+  saveDraftRevision({
+    required String documentId,
+    required String revisionId,
+    required EmbeddingClient embeddings,
+  }) async {
+    final paper = await storage.loadPaper(collectionId, documentId);
+    if (paper == null) throw StateError('Paper not found: $documentId');
+    final loadedRevision = await storage.loadRevision(
+      collectionId,
+      documentId,
+      revisionId,
+    );
+    if (loadedRevision == null) {
+      throw StateError('Revision not found: $revisionId');
+    }
+    var revision = loadedRevision;
+
+    try {
+      if (!revision.isIndexed) {
+        revision = revision.copyWith(
+          status: 'saved',
+          indexStatus: 'indexing',
+          updatedAt: DateTime.now().toUtc(),
+        );
+        await storage.saveRevision(collectionId, revision);
+
+        final collection = await storage.loadCollection(collectionId);
+        if (collection == null) {
+          throw StateError('Collection not found: $collectionId');
+        }
+        var nextVectorId = collection.nextVectorId;
+        final chunks = _revisionChunks(
+          paper,
+          revision.sections,
+          revision.id,
+        ).map((chunk) => chunk.copyWith(vectorId: nextVectorId++)).toList();
+        final vectors = await embeddings.embedTexts(
+          chunks.map((chunk) => chunk.embeddingText).toList(),
+        );
+        await storage.saveCollection(
+          collection.copyWith(nextVectorId: nextVectorId),
+        );
+
+        final index = await openIndex();
+        await storage.saveIndexState(
+          collectionId,
+          IndexState(
+            status: 'dirty',
+            embeddingProfileId: collection.embeddingProfile.id,
+            dimensions: collection.embeddingProfile.dimensions,
+            vectorCount: index.length,
+            pending: {
+              'operation': 'saveRevision',
+              'documentId': documentId,
+              'revisionId': revisionId,
+            },
+          ),
+        );
+        await index.add(chunks, vectors);
+        await index.save(storage.indexVectorsPath(collectionId));
+        revision = revision.copyWith(
+          status: 'saved',
+          indexStatus: 'indexed',
+          chunks: chunks,
+          updatedAt: DateTime.now().toUtc(),
+        );
+        await storage.saveRevision(collectionId, revision);
+        await storage.saveIndexState(
+          collectionId,
+          IndexState(
+            status: 'clean',
+            embeddingProfileId: collection.embeddingProfile.id,
+            dimensions: collection.embeddingProfile.dimensions,
+            vectorCount: index.length,
+          ),
+        );
+      }
+
+      await storage.activateRevision(collectionId, documentId, revisionId);
+      final artifact = await storage.saveSectionArtifacts(
+        collectionId,
+        paper,
+        revision: revision,
+      );
+      return (
+        revision: revision,
+        artifactId: artifact.artifactId,
+        markdownPath: artifact.markdownPath,
+        jsonPath: artifact.jsonPath,
+      );
+    } catch (_) {
+      if (!revision.isIndexed) {
+        final failed = revision.copyWith(
+          status: 'saved',
+          indexStatus: 'failed',
+          updatedAt: DateTime.now().toUtc(),
+        );
+        await storage.saveRevision(collectionId, failed);
+      }
+      rethrow;
+    }
+  }
+
+  Future<SectionRevision> revertToRevision({
+    required String documentId,
+    required String revisionId,
+  }) async {
+    var candidate = await storage.loadRevision(
+      collectionId,
+      documentId,
+      revisionId,
+    );
+    if (candidate == null) throw StateError('Revision not found: $revisionId');
+    while (candidate != null &&
+        !candidate.isIndexed &&
+        candidate.parentRevisionId != null) {
+      candidate = await storage.loadRevision(
+        collectionId,
+        documentId,
+        candidate.parentRevisionId!,
+      );
+    }
+    if (candidate == null || !candidate.isIndexed) {
+      throw StateError('No indexed ancestor is available to restore.');
+    }
+    await storage.activateRevision(collectionId, documentId, candidate.id);
+    return candidate;
+  }
+
+  static List<PaperChunk> _revisionChunks(
+    PaperDocument paper,
+    List<DocumentSection> sections,
+    String revisionId,
+  ) {
+    const maxChars = 2400;
+    final chunks = <PaperChunk>[];
+    var ordinal = 0;
+    for (final section in sections) {
+      if (section.isReferences || section.text.trim().isEmpty) continue;
+      final text = section.text.trim();
+      for (var start = 0, part = 0; start < text.length; part++) {
+        var end = (start + maxChars).clamp(0, text.length);
+        if (end < text.length) {
+          final boundary = text.lastIndexOf(RegExp(r'\s'), end);
+          if (boundary > start + 400) end = boundary;
+        }
+        final body = text.substring(start, end).trim();
+        if (body.isNotEmpty) {
+          chunks.add(
+            PaperChunk(
+              id: '${paper.id}:$revisionId:${section.id}:c$part',
+              vectorId: 0,
+              page: section.startPage,
+              ordinal: ordinal++,
+              section: section.name,
+              sectionId: section.id,
+              startChar: section.startChar + start,
+              endChar: section.startChar + end,
+              text: body,
+              documentId: paper.id,
+              documentTitle: paper.title,
+              documentFileName: paper.fileName,
+            ),
+          );
+        }
+        if (end <= start) break;
+        start = end;
+      }
+    }
+    if (chunks.isEmpty) {
+      throw StateError('The revision has no content that can be indexed.');
+    }
+    return chunks;
   }
 
   /// Writes each figure next to its document and returns the chunks that

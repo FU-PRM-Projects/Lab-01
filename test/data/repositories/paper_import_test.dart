@@ -207,6 +207,19 @@ void main() {
         expect(reloaded.sections.length, paper.sections.length);
         expect(reloaded.chunks.first.sectionId, isNotEmpty);
         expect(reloaded.status, DocumentStatus.ready);
+        expect(
+          await Directory(storage.artifactsDir('col_1', paper.id)).exists(),
+          isFalse,
+          reason: 'Import must not publish an artifact before user approval.',
+        );
+        final original = await storage.loadRevision(
+          'col_1',
+          paper.id,
+          'rev_original',
+        );
+        expect(original, isNotNull);
+        expect(original!.createdBy, 'original_extraction');
+        expect(original.indexStatus, 'indexed');
       },
     );
 

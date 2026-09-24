@@ -1,11 +1,17 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/chat.dart';
+import 'package:lab_05/data/models/chat_artifact.dart';
 import 'package:lab_05/data/models/citation.dart';
+import 'package:lab_05/data/services/section_artifact_service.dart';
 import 'package:lab_05/ui/chat/chat_controller.dart';
 import 'package:lab_05/ui/chat/tool_call_log.dart';
 import 'package:lab_05/ui/core/markdown_math.dart';
@@ -335,6 +341,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       msg.citations,
                     ),
 
+                    if (msg.artifacts.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      for (final artifact in msg.artifacts) ...[
+                        _SectionArtifactCard(artifact: artifact),
+                        const SizedBox(height: 8),
+                      ],
+                    ],
+
                     // Sources Bar if citations present
                     if (msg.citations.isNotEmpty) ...[
                       const SizedBox(height: 14),
@@ -581,6 +595,9 @@ class _StreamingMessageBubble extends ConsumerWidget {
     final toolCalls = ref.watch(
       chatControllerProvider.select((s) => s.toolCalls),
     );
+    final artifacts = ref.watch(
+      chatControllerProvider.select((s) => s.artifacts),
+    );
 
     ref.listen(chatControllerProvider.select((s) => s.streamingText), (
       prev,
@@ -619,6 +636,20 @@ class _StreamingMessageBubble extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (toolCalls.isNotEmpty) ToolCallLog(calls: toolCalls),
+                  if (toolCalls.any(
+                        (call) =>
+                            call.name == 'export_sections' && call.isRunning,
+                      ) &&
+                      artifacts.isEmpty)
+                    _SavingArtifactCard(
+                      title:
+                          toolCalls
+                              .where((call) => call.name == 'export_sections')
+                              .last
+                              .arguments['paperTitle']
+                              ?.toString() ??
+                          'Paper sections',
+                    ),
                   if (statusMessage != null && text.isEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -659,6 +690,13 @@ class _StreamingMessageBubble extends ConsumerWidget {
                         }
                       },
                     ),
+                  if (artifacts.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    for (final artifact in artifacts) ...[
+                      _SectionArtifactCard(artifact: artifact),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
                   if (text.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
@@ -676,6 +714,449 @@ class _StreamingMessageBubble extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SavingArtifactCard extends StatelessWidget {
+  final String title;
+
+  const _SavingArtifactCard({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: colors.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Preparing export review…',
+                  style: context.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _ArtifactSaveChoice { markdown, json, both }
+
+class _SectionArtifactCard extends ConsumerWidget {
+  final ChatArtifact artifact;
+
+  const _SectionArtifactCard({required this.artifact});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.colorScheme;
+    final isDraft = artifact.type == 'sectionDraft';
+    final isRevision = artifact.type == 'sectionRevision';
+    final isDiscarded = artifact.status == 'discarded';
+    final isSuperseded = artifact.status == 'superseded';
+    final formatLabel = switch (artifact.requestedFormat) {
+      'markdown' => 'Markdown',
+      'json' => 'JSON',
+      _ => 'Markdown + JSON',
+    };
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 560),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: colors.secondaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.description_outlined,
+              size: 20,
+              color: colors.onSecondaryContainer,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  artifact.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isDraft
+                      ? (isDiscarded
+                            ? 'Draft discarded'
+                            : isSuperseded
+                            ? 'Superseded by a newer chat edit'
+                            : artifact.status == 'index_failed'
+                            ? 'Revision saved · indexing failed · retry available'
+                            : 'Export review · edit in chat or save when ready')
+                      : artifact.status == 'reverted'
+                      ? 'Revision reverted · exported snapshot retained'
+                      : '${artifact.sectionCount} sections · $formatLabel · saved locally',
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: isDiscarded ? null : () => _open(context, ref),
+            child: const Text('Open'),
+          ),
+          if (isDraft && !isDiscarded && !isSuperseded) ...[
+            FilledButton.tonal(
+              onPressed: () => _saveDraft(context, ref),
+              child: Text(
+                artifact.status == 'index_failed'
+                    ? 'Retry indexing'
+                    : switch (artifact.requestedFormat) {
+                        'markdown' => 'Save Markdown',
+                        'json' => 'Save JSON',
+                        _ => 'Save both',
+                      },
+              ),
+            ),
+            IconButton(
+              tooltip: 'Discard draft',
+              onPressed: () => _discardDraft(context, ref),
+              icon: const Icon(Icons.delete_outline, size: 19),
+            ),
+          ] else ...[
+            if (isRevision &&
+                artifact.parentRevisionId != null &&
+                artifact.status != 'reverted')
+              TextButton(
+                onPressed: () => _revert(context, ref),
+                child: const Text('Revert'),
+              ),
+            PopupMenuButton<_ArtifactSaveChoice>(
+              tooltip: 'Download artifact',
+              onSelected: (choice) => _save(context, ref, choice),
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: _ArtifactSaveChoice.markdown,
+                  child: Text('Save Markdown'),
+                ),
+                PopupMenuItem(
+                  value: _ArtifactSaveChoice.json,
+                  child: Text('Save JSON'),
+                ),
+                PopupMenuItem(
+                  value: _ArtifactSaveChoice.both,
+                  child: Text('Save both'),
+                ),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Download'),
+                    const SizedBox(width: 3),
+                    Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 17,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<({String markdownPath, String jsonPath})> _ensureFiles(
+    WidgetRef ref,
+  ) async {
+    final storage = ref.read(localStorageProvider);
+    final artifactId = artifact.artifactId;
+    final markdownPath = storage.sectionsMarkdownPath(
+      artifact.collectionId,
+      artifact.documentId,
+      artifactId,
+    );
+    final jsonPath = storage.sectionsJsonPath(
+      artifact.collectionId,
+      artifact.documentId,
+      artifactId,
+    );
+    if (await File(markdownPath).exists() && await File(jsonPath).exists()) {
+      return (markdownPath: markdownPath, jsonPath: jsonPath);
+    }
+    final paper = await storage.loadPaper(
+      artifact.collectionId,
+      artifact.documentId,
+    );
+    if (paper == null) {
+      throw StateError('The source paper is no longer available.');
+    }
+    final revision = artifact.revisionId == null
+        ? null
+        : await storage.loadRevision(
+            artifact.collectionId,
+            artifact.documentId,
+            artifact.revisionId!,
+          );
+    final created = await storage.saveSectionArtifacts(
+      artifact.collectionId,
+      paper,
+      revision: revision,
+      artifactId: artifactId,
+    );
+    return (markdownPath: created.markdownPath, jsonPath: created.jsonPath);
+  }
+
+  Future<void> _open(BuildContext context, WidgetRef ref) async {
+    try {
+      final String markdown;
+      final String json;
+      if (artifact.type == 'sectionDraft') {
+        final revisionId = artifact.revisionId;
+        if (revisionId == null) throw StateError('Draft revision is missing.');
+        final storage = ref.read(localStorageProvider);
+        final revision = await storage.loadRevision(
+          artifact.collectionId,
+          artifact.documentId,
+          revisionId,
+        );
+        if (revision == null) throw StateError('Draft revision was deleted.');
+        final paper = await storage.loadPaper(
+          artifact.collectionId,
+          artifact.documentId,
+        );
+        if (paper == null) {
+          throw StateError('The source paper is no longer available.');
+        }
+        final preview = SectionArtifactService.build(
+          paper.copyWith(sections: revision.sections),
+          revisionId: revision.id,
+        );
+        markdown = preview.markdown;
+        json = preview.jsonText;
+      } else {
+        final paths = await _ensureFiles(ref);
+        markdown = await File(paths.markdownPath).readAsString();
+        json = await File(paths.jsonPath).readAsString();
+      }
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => DefaultTabController(
+          length: 2,
+          child: Dialog(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 860, maxHeight: 720),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 8, 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${artifact.title} · Export review',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(dialogContext)
+                                .textTheme
+                                .titleMedium,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Close',
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const TabBar(
+                    tabs: [
+                      Tab(text: 'Markdown'),
+                      Tab(text: 'JSON'),
+                    ],
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        Markdown(
+                          data: markdown,
+                          selectable: true,
+                          padding: const EdgeInsets.all(20),
+                          styleSheet: _ChatPageState.createMarkdownStyle(
+                            dialogContext,
+                          ),
+                        ),
+                        SingleChildScrollView(
+                          padding: const EdgeInsets.all(20),
+                          child: SelectableText(
+                            json,
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12.5,
+                              height: 1.45,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (context.mounted) _showError(context, error);
+    }
+  }
+
+  Future<void> _saveDraft(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref
+          .read(chatControllerProvider.notifier)
+          .saveDraftRevision(artifact);
+    } catch (error) {
+      if (context.mounted) _showError(context, error);
+    }
+  }
+
+  Future<void> _discardDraft(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref
+          .read(chatControllerProvider.notifier)
+          .discardDraftRevision(artifact);
+    } catch (error) {
+      if (context.mounted) _showError(context, error);
+    }
+  }
+
+  Future<void> _revert(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(chatControllerProvider.notifier).revertRevision(artifact);
+    } catch (error) {
+      if (context.mounted) _showError(context, error);
+    }
+  }
+
+  Future<void> _save(
+    BuildContext context,
+    WidgetRef ref,
+    _ArtifactSaveChoice choice,
+  ) async {
+    try {
+      final paths = await _ensureFiles(ref);
+      final baseName = _safeFileName(artifact.title);
+      if (choice == _ArtifactSaveChoice.both) {
+        final directory = await FilePicker.getDirectoryPath(
+          dialogTitle: 'Save section artifacts',
+        );
+        if (directory == null || directory.isEmpty) return;
+        await File(paths.markdownPath)
+            .copy(p.join(directory, '${baseName}_sections.md'));
+        await File(paths.jsonPath)
+            .copy(p.join(directory, '${baseName}_sections.json'));
+      } else {
+        final markdown = choice == _ArtifactSaveChoice.markdown;
+        final sourcePath = markdown ? paths.markdownPath : paths.jsonPath;
+        final extension = markdown ? 'md' : 'json';
+        final destination = await FilePicker.saveFile(
+          dialogTitle: markdown
+              ? 'Save sections as Markdown'
+              : 'Save sections as JSON',
+          fileName: '${baseName}_sections.$extension',
+          bytes: await File(sourcePath).readAsBytes(),
+          mimeType: markdown ? 'text/markdown' : 'application/json',
+          type: FileType.custom,
+          allowedExtensions: [extension],
+        );
+        if (destination == null) return;
+      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Section artifact saved'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (context.mounted) _showError(context, error);
+    }
+  }
+
+  static String _safeFileName(String value) {
+    final cleaned = value
+        .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^[_. ]+|[_. ]+$'), '');
+    return cleaned.isEmpty ? 'paper' : cleaned;
+  }
+
+  static void _showError(BuildContext context, Object error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Could not open section artifact: $error'),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

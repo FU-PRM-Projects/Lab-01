@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lab_05/data/models/chat.dart';
+import 'package:lab_05/data/models/chat_artifact.dart';
 import 'package:lab_05/data/models/citation.dart';
 import 'package:lab_05/data/models/collection.dart';
 import 'package:lab_05/data/models/paper.dart';
@@ -121,6 +122,21 @@ void main() {
             excerpt: 'Graph algorithms for LLM indexing.',
           ),
         ],
+        artifacts: [
+          ChatArtifact(
+            id: 'artifact_1',
+            collectionId: 'col_123',
+            documentId: 'doc_1',
+            title: 'HippoRAG',
+            sectionCount: 7,
+            requestedFormat: 'both',
+            artifactId: 'artifact_export_1',
+            revisionId: 'rev_2',
+            parentRevisionId: 'rev_1',
+            status: 'saved',
+            createdAt: DateTime.utc(2026, 9, 14, 8, 10),
+          ),
+        ],
       );
 
       final chat = Chat(
@@ -141,6 +157,9 @@ void main() {
       expect(roundtrip.messages.first.role, equals('assistant'));
       expect(roundtrip.messages.first.citations.length, equals(1));
       expect(roundtrip.messages.first.citations.first.sourceId, equals('S1'));
+      expect(roundtrip.messages.first.artifacts.single.documentId, 'doc_1');
+      expect(roundtrip.messages.first.artifacts.single.sectionCount, 7);
+      expect(roundtrip.messages.first.artifacts.single.revisionId, 'rev_2');
     });
 
     test('Tool calls survive a chat round trip', () {

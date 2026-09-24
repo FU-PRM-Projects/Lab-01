@@ -10,6 +10,8 @@ import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/app_settings.dart';
 import 'package:lab_05/data/models/chat.dart';
 import 'package:lab_05/data/models/collection.dart';
+import 'package:lab_05/data/models/document_section.dart';
+import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/data/repositories/paper_repository.dart';
 import 'package:lab_05/data/services/collection_index.dart';
 import 'package:lab_05/data/services/local_storage.dart';
@@ -137,6 +139,85 @@ void main() {
         expect(container.read(chatControllerProvider).streamingText, isNull);
         await bytes.close();
       }, () => client);
+    },
+  );
+
+  test(
+    'panel export creates a review card without writing artifact files',
+    () async {
+      final paper = PaperDocument(
+        id: 'doc_1',
+        fileName: 'paper.pdf',
+        title: 'Paper',
+        sha256: 'hash',
+        pageCount: 1,
+        status: DocumentStatus.ready,
+        createdAt: DateTime.utc(2026),
+        embeddingProfileId: 'test',
+        sections: const [
+          DocumentSection(
+            id: 'section_1',
+            ordinal: 0,
+            name: 'Introduction',
+            rawHeading: '1 Introduction',
+            level: 1,
+            kind: SectionKind.body,
+            startPage: 1,
+            endPage: 1,
+            startChar: 0,
+            endChar: 12,
+            text: 'Introduction',
+          ),
+        ],
+      );
+      await storage.savePaper('collection', paper);
+      final result = await container
+          .read(chatControllerProvider.notifier)
+          .exportSectionsFromPanel(paper, format: 'markdown');
+
+      expect(result.type, 'sectionDraft');
+      expect(result.status, 'pending');
+      expect(result.artifactId, isNull);
+      expect(result.revisionId, isNotNull);
+      expect(
+        await Directory(storage.artifactsDir('collection', 'doc_1')).exists(),
+        isFalse,
+      );
+      final revision = await storage.loadRevision(
+        'collection',
+        'doc_1',
+        result.revisionId!,
+      );
+      expect(revision!.createdBy, 'export_review');
+      final saved = await storage.loadChat('collection', 'chat');
+      expect(saved!.messages.map((message) => message.role), [
+        'user',
+        'assistant',
+      ]);
+      expect(saved.messages.last.artifacts.single.documentId, 'doc_1');
+      expect(saved.messages.last.artifacts.single.requestedFormat, 'markdown');
+      expect(container.read(chatControllerProvider).isStreaming, isFalse);
+
+      await container
+          .read(chatControllerProvider.notifier)
+          .saveDraftRevision(result);
+      final afterSave = await storage.loadChat('collection', 'chat');
+      final exported = afterSave!.messages
+          .expand((message) => message.artifacts)
+          .single;
+      expect(exported.type, 'sectionExport');
+      expect(exported.status, 'saved');
+      expect(exported.artifactId, isNotNull);
+      expect(
+        await File(
+          storage.sectionsMarkdownPath(
+            'collection',
+            'doc_1',
+            exported.artifactId,
+          ),
+        ).exists(),
+        isTrue,
+      );
     },
   );
 }
