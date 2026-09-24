@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/citation.dart';
 import 'package:lab_05/ui/core/markdown_math.dart';
+import 'package:lab_05/ui/core/snackbar.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
 class SourcePanel extends ConsumerStatefulWidget {
@@ -274,16 +275,7 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
                   Clipboard.setData(
                     ClipboardData(text: widget.citation.excerpt),
                   );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Excerpt copied to clipboard'),
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  );
+                  showCopiedSnackBar(context, 'Excerpt');
                 },
               ),
             ],
@@ -300,19 +292,11 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
               child: SelectionArea(
                 child: SingleChildScrollView(
                   child: _renderMarkdown
-                      ? MarkdownBody(
+                      ? MathMarkdown(
                           data: _cleanMarkdown(widget.citation.excerpt),
-                          selectable: false,
                           styleSheet: _buildMarkdownStyle(context),
-                          blockSyntaxes: mathBlockSyntaxes,
-                          inlineSyntaxes: [
-                            ...mathInlineSyntaxes,
-                            _UnderlineSyntax(),
-                          ],
-                          builders: {
-                            ...mathBuilders,
-                            'u': _UnderlineBuilder(),
-                          },
+                          extraInlineSyntaxes: [_UnderlineSyntax()],
+                          extraBuilders: {'u': _UnderlineBuilder()},
                           onTapLink: (text, href, title) {
                             if (href != null) {
                               final uri = Uri.tryParse(href);

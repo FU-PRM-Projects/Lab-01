@@ -13,10 +13,12 @@ import 'package:lab_05/data/models/reference.dart';
 import 'package:lab_05/ui/artifacts/artifact_controller.dart';
 import 'package:lab_05/ui/collections/import_controller.dart';
 import 'package:lab_05/ui/core/markdown_math.dart';
+import 'package:lab_05/ui/core/snackbar.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
-/// Per-chat sidebar listing the PDFs of the collection. Selecting one shows
-/// the chunks it was indexed into and the works it cites.
+/// Per-chat sidebar for the folder's one paper: the chunks it was indexed
+/// into, its outline and the works it cites. An empty folder shows the import
+/// instead.
 class ArtifactPanel extends ConsumerWidget {
   final VoidCallback onImportPaper;
 
@@ -28,12 +30,10 @@ class ArtifactPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = context.colorScheme;
     final scope = ref.watch(artifactScopeProvider);
-    final view = ref.watch(artifactViewProvider);
-    final papers = ref.watch(papersProvider);
-
-    final selected = view.selectedPaperId == null
-        ? null
-        : papers.where((paper) => paper.id == view.selectedPaperId).firstOrNull;
+    // A folder holds one paper, so there is nothing to pick between: the
+    // panel opens straight onto it.
+    final paper = ref.watch(papersProvider).firstOrNull;
+    final readable = paper != null && paper.occupiesFolder ? paper : null;
 
     return Container(
       width: panelWidth,
@@ -47,22 +47,15 @@ class ArtifactPanel extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _PanelHeader(
-            title: selected?.title ?? 'Artifacts',
-            subtitle: selected == null
-                ? '${papers.length} ${papers.length == 1 ? 'source' : 'sources'} in this chat'
-                : selected.fileName,
-            onBack: selected == null
-                ? null
-                : () => ref
-                      .read(artifactPanelProvider.notifier)
-                      .clearSelection(scope),
+            title: readable?.title ?? 'Artifacts',
+            subtitle: readable?.fileName ?? 'No paper yet',
             onClose: () =>
                 ref.read(artifactPanelProvider.notifier).close(scope),
           ),
           Expanded(
-            child: selected == null
-                ? _PaperList(scope: scope, onImportPaper: onImportPaper)
-                : _PaperDetail(key: ValueKey(selected.id), paper: selected),
+            child: readable != null
+                ? _PaperDetail(key: ValueKey(readable.id), paper: readable)
+                : _NoPaper(failed: paper, onImportPaper: onImportPaper),
           ),
         ],
       ),
@@ -73,13 +66,11 @@ class ArtifactPanel extends ConsumerWidget {
 class _PanelHeader extends StatelessWidget {
   final String title;
   final String subtitle;
-  final VoidCallback? onBack;
   final VoidCallback onClose;
 
   const _PanelHeader({
     required this.title,
     required this.subtitle,
-    required this.onBack,
     required this.onClose,
   });
 
@@ -98,26 +89,14 @@ class _PanelHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (onBack != null)
-            IconButton(
-              icon: Icon(
-                Icons.arrow_back,
-                size: 18,
-                color: colorScheme.onSurfaceVariant,
-              ),
-              tooltip: 'Back to sources',
-              visualDensity: VisualDensity.compact,
-              onPressed: onBack,
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Icon(
-                Icons.inventory_2_outlined,
-                size: 18,
-                color: colorScheme.onSurfaceVariant,
-              ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Icon(
+              Icons.inventory_2_outlined,
+              size: 18,
+              color: colorScheme.onSurfaceVariant,
             ),
+          ),
           const SizedBox(width: 4),
           Expanded(
             child: Column(
@@ -197,11 +176,6 @@ Future<void> _confirmDeletePaper(
   if (currentCol == null) return;
 
   final repository = ref.read(paperRepositoryProvider(currentCol.id));
-  final scope = ref.read(artifactScopeProvider);
-
-  if (ref.read(artifactViewProvider).selectedPaperId == paper.id) {
-    ref.read(artifactPanelProvider.notifier).clearSelection(scope);
-  }
 
   if (ref.read(activeCitationProvider)?.documentId == paper.id) {
     ref.read(activeCitationProvider.notifier).state = null;
@@ -212,269 +186,65 @@ Future<void> _confirmDeletePaper(
         .read(projectPapersProvider(currentCol.id).notifier)
         .deletePaper(paper.id, repository);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Deleted "${paper.title}"'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showAppSnackBar(context, 'Deleted "${paper.title}"');
     }
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error deleting paper: $e'),
-          backgroundColor: colorScheme.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showAppSnackBar(context, 'Error deleting paper: $e', isError: true);
     }
   }
 }
 
-class _PaperList extends ConsumerWidget {
-  final String scope;
+/// What the panel shows until the folder has a readable paper: the import
+/// button, and the reason when the last import failed.
+class _NoPaper extends ConsumerWidget {
+  /// The folder's paper when its import failed or is still running.
+  final PaperDocument? failed;
   final VoidCallback onImportPaper;
 
-  const _PaperList({required this.scope, required this.onImportPaper});
+  const _NoPaper({required this.failed, required this.onImportPaper});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = context.colorScheme;
-    final textTheme = context.textTheme;
-
-    final papers = ref.watch(papersProvider);
-    final citedChunkIds = ref.watch(citedChunkIdsProvider);
-    final importProgress = ref.watch(importControllerProvider);
-    // One paper per folder: the upload button exists only while the folder
-    // is still empty (or its only import failed).
-    final canImport = ref.watch(canImportPaperProvider);
+    final importing = ref.watch(importControllerProvider) != null;
+    final error = failed?.status == DocumentStatus.failed
+        ? failed?.error
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (canImport || importProgress != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-            child: FilledButton.tonalIcon(
-              onPressed: importProgress != null ? null : onImportPaper,
-              icon: const Icon(Icons.upload_file_outlined, size: 17),
-              label: Text(importProgress != null ? 'Importing…' : 'Upload PDF'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+          child: FilledButton.tonalIcon(
+            onPressed: importing ? null : onImportPaper,
+            icon: const Icon(Icons.upload_file_outlined, size: 17),
+            label: Text(importing ? 'Importing…' : 'Upload PDF'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
+        ),
         Expanded(
-          child: papers.isEmpty
+          child: error != null
               ? _EmptyHint(
+                  icon: Icons.error_outline,
+                  title: 'The last import failed',
+                  message: '$error\n\nUpload the PDF again to retry.',
+                )
+              : const _EmptyHint(
                   icon: Icons.picture_as_pdf_outlined,
                   title: 'No paper yet',
                   message:
                       'Each folder holds one research paper. Upload it and it '
                       'will show up here with its indexed chunks and the '
                       'works it cites.',
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
-                  itemCount: papers.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final paper = papers[index];
-                    final citedCount = paper.chunks
-                        .where((chunk) => citedChunkIds.contains(chunk.id))
-                        .length;
-                    return _PaperCard(
-                      paper: paper,
-                      citedCount: citedCount,
-                      onTap: () => ref
-                          .read(artifactPanelProvider.notifier)
-                          .select(scope, paper.id),
-                      onDelete: () => _confirmDeletePaper(context, ref, paper),
-                    );
-                  },
                 ),
         ),
-        if (papers.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-            child: Text(
-              'Chips mark passages this chat has already cited.',
-              style: textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                fontSize: 11,
-              ),
-            ),
-          ),
       ],
-    );
-  }
-}
-
-class _PaperCard extends StatelessWidget {
-  final PaperDocument paper;
-  final int citedCount;
-  final VoidCallback onTap;
-  final VoidCallback? onDelete;
-
-  const _PaperCard({
-    required this.paper,
-    required this.citedCount,
-    required this.onTap,
-    this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = context.colorScheme;
-    final textTheme = context.textTheme;
-
-    final (IconData icon, Color iconColor) = switch (paper.status) {
-      DocumentStatus.ready => (
-        Icons.picture_as_pdf_outlined,
-        colorScheme.primary,
-      ),
-      DocumentStatus.processing => (Icons.sync, colorScheme.primary),
-      DocumentStatus.needsReindex => (Icons.refresh, colorScheme.tertiary),
-      DocumentStatus.deleting => (
-        Icons.delete_outline,
-        colorScheme.onSurfaceVariant,
-      ),
-      DocumentStatus.failed => (Icons.error_outline, colorScheme.error),
-    };
-
-    return Material(
-      color: colorScheme.surfaceContainer,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: colorScheme.outlineVariant),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, size: 18, color: iconColor),
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      paper.title,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13.5,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        _MiniChip(
-                          label:
-                              '${paper.pageCount} ${paper.pageCount == 1 ? 'page' : 'pages'}',
-                        ),
-                        _MiniChip(label: '${paper.chunks.length} chunks'),
-                        if (citedCount > 0)
-                          _MiniChip(
-                            label: '$citedCount cited',
-                            highlighted: true,
-                          ),
-                        if (paper.status == DocumentStatus.failed)
-                          _MiniChip(label: 'failed', isError: true),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (onDelete != null)
-                    IconButton(
-                      icon: Icon(
-                        Icons.delete_outline,
-                        size: 18,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      tooltip: 'Delete PDF',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: onDelete,
-                    ),
-                  Icon(
-                    Icons.chevron_right,
-                    size: 18,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniChip extends StatelessWidget {
-  final String label;
-  final bool highlighted;
-  final bool isError;
-
-  const _MiniChip({
-    required this.label,
-    this.highlighted = false,
-    this.isError = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = context.colorScheme;
-    final background = isError
-        ? colorScheme.errorContainer
-        : highlighted
-        ? colorScheme.primaryContainer
-        : colorScheme.surfaceContainerHighest;
-    final foreground = isError
-        ? colorScheme.onErrorContainer
-        : highlighted
-        ? colorScheme.onPrimaryContainer
-        : colorScheme.onSurfaceVariant;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w600,
-          color: foreground,
-        ),
-      ),
     );
   }
 }
@@ -842,13 +612,10 @@ class _SectionRowState extends State<_SectionRow> {
                 left: BorderSide(color: colorScheme.outlineVariant, width: 1),
               ),
             ),
-            child: MarkdownBody(
+            child: MathMarkdown(
               data: section.text.trim(),
               selectable: true,
               styleSheet: _sectionMarkdownStyle(context),
-              blockSyntaxes: mathBlockSyntaxes,
-              inlineSyntaxes: mathInlineSyntaxes,
-              builders: mathBuilders,
             ),
           ),
           crossFadeState: _expanded
@@ -1193,15 +960,7 @@ class _ReferenceRow extends StatelessWidget {
     final launched =
         isWeb && await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not open $url'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      showAppSnackBar(context, 'Could not open $url');
     }
   }
 
@@ -1309,18 +1068,7 @@ class _ReferenceRow extends StatelessWidget {
                       padding: EdgeInsets.zero,
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: reference.raw));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text(
-                              'Reference copied to clipboard',
-                            ),
-                            behavior: SnackBarBehavior.floating,
-                            duration: const Duration(seconds: 1),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        );
+                        showCopiedSnackBar(context, 'Reference');
                       },
                     ),
                   ],

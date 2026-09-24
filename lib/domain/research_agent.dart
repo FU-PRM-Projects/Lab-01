@@ -294,16 +294,16 @@ $initialEvidence
           summary: _passageSummary(chunks.length),
         );
       case 'read_page':
-        final documentId = call.arguments['documentId'];
+        // A folder holds one paper, so a page number is all the model needs.
         final page = call.arguments['page'];
-        if (documentId is! String || page is! int) {
-          return _ToolOutcome.rejected(
-            'documentId and an integer page are required.',
-          );
+        if (page is! int) {
+          return _ToolOutcome.rejected('An integer page is required.');
         }
-        final paper = evidence.papers[documentId];
-        if (paper == null || paper.status != DocumentStatus.ready) {
-          return _ToolOutcome.rejected('Document is not available.');
+        final paper = evidence.papers.values
+            .where((paper) => paper.status == DocumentStatus.ready)
+            .firstOrNull;
+        if (paper == null) {
+          return _ToolOutcome.rejected('The paper is not available.');
         }
         if (page < 1 || page > paper.pageCount) {
           return _ToolOutcome.rejected('Page is outside this document.');
@@ -315,17 +315,6 @@ $initialEvidence
         return _ToolOutcome(
           result: evidence.register(pageChunks),
           summary: _passageSummary(pageChunks.length),
-        );
-      case 'list_papers':
-        final papers = evidence.papers.values.take(100).toList();
-        return _ToolOutcome(
-          result: papers
-              .map(
-                (paper) =>
-                    '${paper.id} | ${paper.title} | ${paper.status.name} | ${paper.pageCount} pages',
-              )
-              .join('\n'),
-          summary: papers.length == 1 ? '1 paper' : '${papers.length} papers',
         );
       default:
         return _ToolOutcome.rejected('Unknown tool: ${call.name}');
@@ -424,7 +413,7 @@ $initialEvidence
   static const _tools = [
     ToolSpec(
       name: 'search_papers',
-      description: 'Search the current collection for relevant passages.',
+      description: 'Search the paper for relevant passages.',
       inputJsonSchema: {
         'type': 'object',
         'properties': {
@@ -435,20 +424,14 @@ $initialEvidence
     ),
     ToolSpec(
       name: 'read_page',
-      description: 'Read passages from a physical PDF page (1-indexed).',
+      description: 'Read passages from a physical page of the paper (1-indexed).',
       inputJsonSchema: {
         'type': 'object',
         'properties': {
-          'documentId': {'type': 'string'},
           'page': {'type': 'integer'},
         },
-        'required': ['documentId', 'page'],
+        'required': ['page'],
       },
-    ),
-    ToolSpec(
-      name: 'list_papers',
-      description: 'List papers in the current collection.',
-      inputJsonSchema: {'type': 'object', 'properties': <String, dynamic>{}},
     ),
   ];
 }

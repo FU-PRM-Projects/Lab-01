@@ -122,7 +122,7 @@ void main() {
     },
   );
 
-  testWidgets('ArtifactPanel shows Delete PDF button and confirmation dialog', (
+  testWidgets('ArtifactPanel opens the folder paper and confirms Delete', (
     tester,
   ) async {
     final tempDir = Directory.systemTemp.createTempSync('ui_feature_test2');
@@ -181,21 +181,20 @@ void main() {
     });
     await tester.pump();
 
-    // Verify paper card is shown
+    // The folder's one paper opens directly, with no list to pick from.
     expect(find.text('Attention Is All You Need'), findsOneWidget);
+    expect(find.text('attention_is_all_you_need.pdf'), findsOneWidget);
 
-    // Verify Delete PDF button is present on paper card
-    final deleteButtons = find.byTooltip('Delete PDF');
-    expect(deleteButtons, findsOneWidget);
-
-    // Tap Delete PDF button
-    await tester.tap(deleteButtons.first);
+    // Tap the Delete action in the paper's action bar
+    final deleteAction = find.text('Delete');
+    expect(deleteAction, findsOneWidget);
+    await tester.tap(deleteAction);
     await tester.pump();
 
     // Verify confirmation dialog appears
     expect(find.text('Delete "Attention Is All You Need"?'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
-    expect(find.text('Delete'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Delete'), findsOneWidget);
 
     // Tap Cancel
     await tester.tap(find.text('Cancel'));

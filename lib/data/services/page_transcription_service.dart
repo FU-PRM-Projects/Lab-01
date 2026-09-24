@@ -7,7 +7,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/retry.dart';
 
 import 'package:lab_05/data/models/app_settings.dart';
-import 'package:lab_05/domain/indexing/document_transcript.dart';
 
 /// Transcribes rendered PDF pages to Markdown with a multimodal model on
 /// OpenRouter.
@@ -202,13 +201,4 @@ String openRouterErrorMessage(String body) {
   return message.length > maxLength
       ? '${message.substring(0, maxLength)}...'
       : message;
-}
-
-/// Convenience for building a transcript out of per-page Markdown.
-DocumentTranscript transcriptFromPageTexts(Map<int, String> pageTexts) {
-  final pages = pageTexts.keys.toList()..sort();
-  return DocumentTranscript.fromPages([
-    for (final page in pages)
-      PageTranscript(page: page, text: pageTexts[page]!),
-  ]);
 }

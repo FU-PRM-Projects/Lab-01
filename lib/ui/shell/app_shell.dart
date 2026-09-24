@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lab_05/app/providers.dart';
+import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/ui/artifacts/artifact_controller.dart';
 import 'package:lab_05/ui/artifacts/artifact_panel.dart';
 import 'package:lab_05/ui/chat/chat_controller.dart';
@@ -12,6 +13,7 @@ import 'package:lab_05/ui/chat/chat_page.dart';
 import 'package:lab_05/ui/chat/composer.dart';
 import 'package:lab_05/ui/collections/import_controller.dart';
 import 'package:lab_05/ui/collections/sidebar.dart';
+import 'package:lab_05/ui/core/snackbar.dart';
 import 'package:lab_05/ui/core/theme.dart';
 import 'package:lab_05/ui/settings/settings_dialog.dart';
 import 'package:lab_05/ui/sources/source_panel.dart';
@@ -27,31 +29,16 @@ class _AppShellState extends ConsumerState<AppShell> {
   Future<void> _pickAndImportPaper() async {
     final collection = ref.read(currentCollectionProvider);
     if (collection == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please select or create a collection first'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      showAppSnackBar(context, 'Please select or create a collection first');
       return;
     }
 
     // A folder holds exactly one paper; another paper needs its own folder.
     if (!ref.read(canImportPaperProvider)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'This folder already has its paper. '
-            'Create a new folder to import another one.',
-          ),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
+      showAppSnackBar(
+        context,
+        'This folder already has its paper. '
+        'Create a new folder to import another one.',
       );
       return;
     }
@@ -62,16 +49,9 @@ class _AppShellState extends ConsumerState<AppShell> {
         context: context,
         builder: (_) => const SettingsDialog(),
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'OpenRouter API Key required for embeddings and indexing',
-          ),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
+      showAppSnackBar(
+        context,
+        'OpenRouter API Key required for embeddings and indexing',
       );
       return;
     }
@@ -101,49 +81,24 @@ class _AppShellState extends ConsumerState<AppShell> {
         ref
             .read(artifactPanelProvider.notifier)
             .open(ref.read(artifactScopeProvider));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(
-                  Icons.check_circle_outline,
-                  color: Colors.white,
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Successfully imported "${sourceFile.uri.pathSegments.last}"',
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            duration: const Duration(seconds: 3),
-          ),
+        showAppSnackBar(
+          context,
+          'Successfully imported "${sourceFile.uri.pathSegments.last}"',
+          isSuccess: true,
+          duration: const Duration(seconds: 3),
         );
       }
     } catch (e) {
       if (mounted) {
-        final colorScheme = Theme.of(context).colorScheme;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Import error: $e'),
-            backgroundColor: colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            action: SnackBarAction(
-              label: 'Retry',
-              textColor: colorScheme.onError,
-              onPressed: _pickAndImportPaper,
-            ),
-            duration: const Duration(seconds: 5),
+        showAppSnackBar(
+          context,
+          'Import error: $e',
+          isError: true,
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Theme.of(context).colorScheme.onError,
+            onPressed: _pickAndImportPaper,
           ),
         );
       }
@@ -157,14 +112,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     ref.read(currentChatProvider.notifier).state = null;
   }
 
-  void _toggleTheme() {
-    final settings = ref.read(settingsProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final nextTheme = isDark ? 'light' : 'dark';
-    ref
-        .read(settingsProvider.notifier)
-        .update(settings.copyWith(theme: nextTheme));
-  }
+  void _toggleTheme() => ref
+      .read(settingsProvider.notifier)
+      .toggleTheme(Theme.of(context).brightness);
 
   @override
   Widget build(BuildContext context) {
@@ -173,7 +123,11 @@ class _AppShellState extends ConsumerState<AppShell> {
     final isDark = context.isDarkMode;
 
     final collection = ref.watch(currentCollectionProvider);
-    final papers = ref.watch(papersProvider);
+    // The folder's one paper, once it has indexed.
+    final paper = ref
+        .watch(papersProvider)
+        .where((p) => p.occupiesFolder)
+        .firstOrNull;
     final activeCitation = ref.watch(activeCitationProvider);
     final importProgress = ref.watch(importControllerProvider);
     final artifactScope = ref.watch(artifactScopeProvider);
@@ -232,25 +186,29 @@ class _AppShellState extends ConsumerState<AppShell> {
                       ),
                       if (collection != null) ...[
                         const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.secondaryContainer,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: colorScheme.outlineVariant.withValues(
-                                alpha: 0.5,
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant.withValues(
+                                  alpha: 0.5,
+                                ),
                               ),
                             ),
-                          ),
-                          child: Text(
-                            '${papers.length} ${papers.length == 1 ? 'paper' : 'papers'}',
-                            style: textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSecondaryContainer,
-                              fontWeight: FontWeight.w600,
+                            child: Text(
+                              paper?.title ?? 'No paper yet',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSecondaryContainer,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
@@ -260,18 +218,14 @@ class _AppShellState extends ConsumerState<AppShell> {
                       // Per-chat artifact sidebar toggle
                       if (collection != null)
                         IconButton(
-                          icon: Badge(
-                            isLabelVisible: papers.isNotEmpty,
-                            label: Text('${papers.length}'),
-                            child: Icon(
-                              artifactView.isOpen
-                                  ? Icons.inventory_2
-                                  : Icons.inventory_2_outlined,
-                              size: 19,
-                              color: artifactView.isOpen
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
-                            ),
+                          icon: Icon(
+                            artifactView.isOpen
+                                ? Icons.inventory_2
+                                : Icons.inventory_2_outlined,
+                            size: 19,
+                            color: artifactView.isOpen
+                                ? colorScheme.primary
+                                : colorScheme.onSurfaceVariant,
                           ),
                           tooltip: artifactView.isOpen
                               ? 'Hide artifacts'
