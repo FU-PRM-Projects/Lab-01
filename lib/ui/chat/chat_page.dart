@@ -8,6 +8,7 @@ import 'package:lab_05/data/models/chat.dart';
 import 'package:lab_05/data/models/citation.dart';
 import 'package:lab_05/ui/chat/chat_controller.dart';
 import 'package:lab_05/ui/chat/tool_call_log.dart';
+import 'package:lab_05/ui/collections/import_controller.dart';
 import 'package:lab_05/ui/core/markdown_math.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
@@ -159,6 +160,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   Widget _buildEmptyState(BuildContext context, String collectionName) {
     final colorScheme = context.colorScheme;
     final textTheme = context.textTheme;
+    // An empty folder has nothing to chat about yet; its one paper is the
+    // only thing to offer, and this is the only place that offers it.
+    final canImport = ref.watch(canImportPaperProvider);
+    final importing = ref.watch(importControllerProvider) != null;
 
     return Center(
       child: ConstrainedBox(
@@ -192,7 +197,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Ask questions, compare findings, and trace every answer back to your papers.',
+                canImport
+                    ? 'Each folder holds one research paper. Import it to start '
+                          'asking questions with every answer traced back to it.'
+                    : 'Ask questions, compare findings, and trace every answer back to your paper.',
                 style: textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -200,34 +208,51 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ),
               const SizedBox(height: 24),
 
-              // Prompt suggestion chips
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                alignment: WrapAlignment.center,
-                children: [
-                  _buildPromptChip(
-                    context,
-                    'Summarize main methodology and novelty',
-                    Icons.auto_stories_outlined,
+              if (canImport)
+                FilledButton.icon(
+                  key: const ValueKey('import-paper-button'),
+                  onPressed: importing ? null : widget.onImportPaper,
+                  icon: const Icon(Icons.upload_file_outlined, size: 18),
+                  label: Text(importing ? 'Importing…' : 'Import paper (PDF)'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  _buildPromptChip(
-                    context,
-                    'Compare evaluation benchmarks & metrics',
-                    Icons.insights_outlined,
-                  ),
-                  _buildPromptChip(
-                    context,
-                    'Extract key algorithmic equations & steps',
-                    Icons.calculate_outlined,
-                  ),
-                  _buildPromptChip(
-                    context,
-                    'What limitations do the authors highlight?',
-                    Icons.psychology_alt_outlined,
-                  ),
-                ],
-              ),
+                )
+              else
+                // Prompt suggestion chips
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    _buildPromptChip(
+                      context,
+                      'Summarize main methodology and novelty',
+                      Icons.auto_stories_outlined,
+                    ),
+                    _buildPromptChip(
+                      context,
+                      'Compare evaluation benchmarks & metrics',
+                      Icons.insights_outlined,
+                    ),
+                    _buildPromptChip(
+                      context,
+                      'Extract key algorithmic equations & steps',
+                      Icons.calculate_outlined,
+                    ),
+                    _buildPromptChip(
+                      context,
+                      'What limitations do the authors highlight?',
+                      Icons.psychology_alt_outlined,
+                    ),
+                  ],
+                ),
             ],
           ),
         ),

@@ -303,3 +303,14 @@ class PaperDocument {
     };
   }
 }
+
+/// A folder holds exactly one paper, and this says whether [PaperDocument]
+/// fills that slot.
+///
+/// Only a paper that indexed (or indexed under an older pipeline and now
+/// awaits a re-import) takes the slot. A failed or abandoned import is
+/// leftover state, and the next import replaces it.
+extension PaperFolderSlot on PaperDocument {
+  bool get occupiesFolder =>
+      status == DocumentStatus.ready || status == DocumentStatus.needsReindex;
+}

@@ -289,3 +289,10 @@ final currentChatProvider = StateProvider<Chat?>((ref) => null);
 
 // Source Panel Citation Provider
 final activeCitationProvider = StateProvider<Citation?>((ref) => null);
+
+/// Whether the current folder can still take its one paper. Every import
+/// entry point in the UI is shown only while this is true.
+final canImportPaperProvider = Provider<bool>((ref) {
+  if (ref.watch(currentCollectionProvider) == null) return false;
+  return !ref.watch(papersProvider).any((paper) => paper.occupiesFolder);
+});

@@ -252,5 +252,91 @@ void main() {
       expect(stored.error, contains('Insufficient credits'));
       expect(stored.chunks, isEmpty);
     });
+
+    group('one paper per folder', () {
+      IndexingPipeline failingPipeline(AppSettings settings) {
+        return IndexingPipeline(
+          settings: settings,
+          openPageImages: () => FakePageImages(1),
+          transcriberFactory: (_) => PageTranscriptionService(
+            settings: settings,
+            client: MockClient(
+              (_) async => http.Response(
+                jsonEncode({
+                  'error': {'message': 'Insufficient credits'},
+                }),
+                402,
+              ),
+            ),
+          ),
+          instructFactory: (_) => InstructDocumentService(
+            settings: settings,
+            client: MockClient((_) async => completionOf(analysisJson)),
+          ),
+        );
+      }
+
+      test('a second, different paper is refused', () async {
+        final repository = PaperRepository(
+          storage: storage,
+          collectionId: 'col_1',
+          pipelineFactory: workingPipeline,
+        );
+        addTearDown(repository.close);
+
+        await repository.importPaper(
+          sourcePdfFile: File('${tempDir.path}/first.pdf')
+            ..writeAsBytesSync([1, 2, 3]),
+          embeddings: fakeEmbeddings(),
+        );
+
+        await expectLater(
+          repository.importPaper(
+            sourcePdfFile: File('${tempDir.path}/second.pdf')
+              ..writeAsBytesSync([4, 5, 6]),
+            embeddings: fakeEmbeddings(),
+          ),
+          throwsA(isA<FolderOccupiedException>()),
+        );
+
+        final stored = await storage.listPapers('col_1');
+        expect(stored, hasLength(1));
+        expect(stored.single.fileName, 'first.pdf');
+      });
+
+      test('a failed import is replaced by the next one', () async {
+        final failing = PaperRepository(
+          storage: storage,
+          collectionId: 'col_1',
+          pipelineFactory: failingPipeline,
+        );
+        await expectLater(
+          failing.importPaper(
+            sourcePdfFile: File('${tempDir.path}/broken.pdf')
+              ..writeAsBytesSync([9, 9]),
+            embeddings: fakeEmbeddings(),
+          ),
+          throwsA(anything),
+        );
+        failing.close();
+
+        final working = PaperRepository(
+          storage: storage,
+          collectionId: 'col_1',
+          pipelineFactory: workingPipeline,
+        );
+        addTearDown(working.close);
+        final paper = await working.importPaper(
+          sourcePdfFile: File('${tempDir.path}/good.pdf')
+            ..writeAsBytesSync([1, 2, 3]),
+          embeddings: fakeEmbeddings(),
+        );
+
+        final stored = await storage.listPapers('col_1');
+        expect(stored, hasLength(1));
+        expect(stored.single.id, paper.id);
+        expect(stored.single.status, DocumentStatus.ready);
+      });
+    });
   });
 }
