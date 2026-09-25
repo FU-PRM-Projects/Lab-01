@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -11,8 +10,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/citation.dart';
-import 'package:lab_05/data/models/paper.dart';
+import 'package:lab_05/data/services/figure_export.dart';
 import 'package:lab_05/ui/artifacts/artifact_controller.dart';
+import 'package:lab_05/ui/core/figure_actions.dart';
 import 'package:lab_05/ui/core/markdown_math.dart';
 import 'package:lab_05/ui/core/snackbar.dart';
 import 'package:lab_05/ui/core/theme.dart';
@@ -32,7 +32,12 @@ class SourcePanel extends ConsumerStatefulWidget {
 }
 
 class _SourcePanelState extends ConsumerState<SourcePanel> {
-  _PanelView _view = _PanelView.excerpt;
+  /// The view the person picked, or null to follow the citation's default:
+  /// the image for a figure, the excerpt for text. Kept apart from the
+  /// default so a figure whose paper loads late still opens on its image,
+  /// while a deliberate choice is never overridden. The panel is keyed by
+  /// chunk id, so a different citation always starts with a fresh choice.
+  _PanelView? _chosenView;
   bool _renderMarkdown = true;
   PdfViewerController? _pdfController;
 
@@ -40,38 +45,18 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
   void initState() {
     super.initState();
     _pdfController = PdfViewerController();
-    _view = _defaultViewFor(widget.citation);
   }
 
-  /// A figure citation opens straight on its image; a text citation opens on
-  /// the excerpt, same as before this feature existed.
-  _PanelView _defaultViewFor(Citation citation) {
-    final chunk = _chunkFor(citation);
-    return (chunk?.isFigure ?? false) ? _PanelView.figure : _PanelView.excerpt;
-  }
-
-  PaperChunk? _chunkFor(Citation citation) {
-    final chunks = ref.read(paperChunksProvider(citation.documentId));
-    for (final chunk in chunks) {
-      if (chunk.id == citation.chunkId) return chunk;
-    }
-    return null;
-  }
+  void _choose(_PanelView view) => setState(() => _chosenView = view);
 
   @override
   void didUpdateWidget(covariant SourcePanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.citation.page != widget.citation.page ||
         oldWidget.citation.documentId != widget.citation.documentId) {
-      if (_view == _PanelView.pdf) {
+      if (_chosenView == _PanelView.pdf) {
         _pdfController?.goToPage(pageNumber: widget.citation.page);
       }
-    }
-    // A different citation resets to its own default view, so switching from
-    // a figure to a text passage does not leave the panel stuck showing an
-    // "Excerpt" tab with nothing under it, or vice versa.
-    if (oldWidget.citation.chunkId != widget.citation.chunkId) {
-      _view = _defaultViewFor(widget.citation);
     }
   }
 
@@ -88,31 +73,33 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
 
     final collection = ref.watch(currentCollectionProvider);
     final storage = ref.watch(localStorageProvider);
-    final chunk = _chunkFor(widget.citation);
-    final isFigure = chunk?.isFigure ?? false;
+    // Watched, not read: the paper may still be loading when the panel
+    // opens, and the figure view should appear as soon as it has.
+    final paper = ref.watch(paperByIdProvider(widget.citation.documentId));
 
     String? pdfPath;
     bool pdfExists = false;
-    String? figurePath;
-    bool figureExists = false;
+    PaperFigure? figure;
     if (collection != null) {
       pdfPath = storage.paperPdfPath(collection.id, widget.citation.documentId);
       pdfExists = File(pdfPath).existsSync();
-      if (isFigure) {
-        figurePath = storage.figurePath(
-          collection.id,
-          widget.citation.documentId,
-          chunk!.imagePath!,
-        );
-        figureExists = File(figurePath).existsSync();
+      if (paper != null) {
+        figure = FigureExporter(storage)
+            .figuresOf(collection.id, paper)
+            .where((f) => f.chunk.id == widget.citation.chunkId)
+            .firstOrNull;
       }
     }
+    final figureExists = figure?.exists ?? false;
 
+    final view =
+        _chosenView ??
+        (figure != null ? _PanelView.figure : _PanelView.excerpt);
     // A figure whose file went missing has nothing to show as a figure, so
     // the panel falls back to the excerpt body rather than a blank pane.
-    final effectiveView = (_view == _PanelView.figure && !figureExists)
+    final effectiveView = (view == _PanelView.figure && !figureExists)
         ? _PanelView.excerpt
-        : _view;
+        : view;
 
     return Container(
       width: 500,
@@ -174,7 +161,11 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
                       color: colorScheme.onSurfaceVariant,
                     ),
                     tooltip: 'Export image',
-                    onPressed: () => _exportFigure(context, figurePath!),
+                    onPressed: () => saveFigureAs(
+                      context,
+                      figure: figure!,
+                      paperTitle: widget.citation.title,
+                    ),
                   ),
                 IconButton(
                   icon: Icon(
@@ -195,22 +186,39 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
             color: colorScheme.surfaceContainerLow,
             child: Row(
               children: [
-                _buildInfoChip(
-                  context,
-                  Icons.description_outlined,
-                  'Page ${widget.citation.page}',
-                ),
-                if (widget.citation.section.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  _buildInfoChip(
-                    context,
-                    Icons.bookmark_outline,
-                    widget.citation.section,
+                // The chips take whatever the view selector leaves, and a
+                // long section name is cut short instead of pushing the
+                // selector past the panel's edge.
+                Expanded(
+                  child: Row(
+                    children: [
+                      _buildInfoChip(
+                        context,
+                        Icons.description_outlined,
+                        'Page ${widget.citation.page}',
+                      ),
+                      if (widget.citation.section.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Tooltip(
+                            message: widget.citation.section,
+                            child: _buildInfoChip(
+                              context,
+                              Icons.bookmark_outline,
+                              widget.citation.section,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
-                const Spacer(),
+                ),
+                const SizedBox(width: 8),
                 if (figureExists || pdfExists)
                   SegmentedButton<_PanelView>(
+                    // The check mark would add width to every segment; the
+                    // filled background already marks the selected one.
+                    showSelectedIcon: false,
                     segments: [
                       if (figureExists)
                         const ButtonSegment<_PanelView>(
@@ -231,11 +239,7 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
                         ),
                     ],
                     selected: {effectiveView},
-                    onSelectionChanged: (Set<_PanelView> selected) {
-                      setState(() {
-                        _view = selected.first;
-                      });
-                    },
+                    onSelectionChanged: (selected) => _choose(selected.first),
                     style: SegmentedButton.styleFrom(
                       visualDensity: VisualDensity.compact,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -249,7 +253,7 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
           Expanded(
             child: switch (effectiveView) {
               _PanelView.figure when figureExists =>
-                _buildFigureView(context, figurePath!),
+                _buildFigureView(context, figure!.path),
               _PanelView.pdf when pdfExists && pdfPath != null =>
                 _buildPdfViewer(pdfPath),
               _ => _buildExcerptView(context, pdfExists),
@@ -258,42 +262,6 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
         ],
       ),
     );
-  }
-
-  /// Writes [figurePath]'s bytes wherever the person chooses via the native
-  /// save-as dialog. Mirrors the PDF-import flow's use of [FilePicker] in
-  /// `app_shell.dart`, just for saving instead of picking.
-  Future<void> _exportFigure(BuildContext context, String figurePath) async {
-    final Uint8List bytes;
-    try {
-      bytes = await File(figurePath).readAsBytes();
-    } catch (e) {
-      if (context.mounted) {
-        showAppSnackBar(context, 'Could not read the figure file: $e');
-      }
-      return;
-    }
-
-    final extension = figurePath.contains('.')
-        ? figurePath.substring(figurePath.lastIndexOf('.') + 1)
-        : 'png';
-    final suggestedName =
-        '${widget.citation.sourceId}_p${widget.citation.page}.$extension';
-
-    try {
-      final saved = await FilePicker.saveFile(
-        dialogTitle: 'Export figure image',
-        fileName: suggestedName,
-        bytes: bytes,
-      );
-      if (saved != null && context.mounted) {
-        showAppSnackBar(context, 'Saved $suggestedName', isSuccess: true);
-      }
-    } catch (e) {
-      if (context.mounted) {
-        showAppSnackBar(context, 'Could not save the image: $e');
-      }
-    }
   }
 
   Widget _buildFigureView(BuildContext context, String figurePath) {
@@ -324,19 +292,26 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
           ),
           if (widget.citation.excerpt.trim().isNotEmpty) ...[
             const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: colorScheme.outlineVariant),
-              ),
-              child: Text(
-                widget.citation.excerpt,
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.5,
+            // Captions can run to several sentences; a bounded, scrollable
+            // box keeps a long one from pushing the layout past the panel.
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 160),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainer,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: colorScheme.outlineVariant),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(
+                    widget.citation.excerpt,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.5,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -362,12 +337,16 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
         children: [
           Icon(icon, size: 13, color: colorScheme.onSurfaceVariant),
           const SizedBox(width: 5),
-          Text(
-            label,
-            style: textTheme.labelSmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -507,11 +486,7 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
             )
           else
             FilledButton.tonalIcon(
-              onPressed: () {
-                setState(() {
-                  _view = _PanelView.pdf;
-                });
-              },
+              onPressed: () => _choose(_PanelView.pdf),
               icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
               label: Text('Inspect Page ${widget.citation.page} in PDF Viewer'),
               style: FilledButton.styleFrom(
