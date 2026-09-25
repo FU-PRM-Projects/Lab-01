@@ -386,6 +386,54 @@ void main() {
     expect(count, 2);
   });
 
+  test('JSON draft payload is converted into a change card', () async {
+    var count = 0;
+    final model = agent(
+      MockClient((request) async {
+        count++;
+        if (count == 1) {
+          return _stream([
+            {
+              'content':
+                  '```json\n'
+                  '${jsonEncode({'sectionName': 'Results', 'baseRevisionId': 'rev_original', 'content': '## 4 Results\n\nExpanded explanation.'})}\n'
+                  '```',
+            },
+          ]);
+        }
+        return _stream([
+          {'content': 'Change draft ready for review.'},
+        ]);
+      }),
+    );
+
+    final events = await model
+        .streamAnswer(
+          collectionId: 'collection',
+          userQuestion: 'p1',
+          previousMessages: const [
+            {'role': 'assistant', 'content': 'Bạn muốn chỉnh section nào?'},
+          ],
+        )
+        .toList();
+
+    expect(events.whereType<ChatError>().map((event) => event.error), isEmpty);
+    final card = events.whereType<ArtifactCreated>().single.artifact;
+    expect(card.type, 'sectionChangeDraft');
+    expect(card.status, 'pending');
+    expect(
+      events.whereType<TextChunk>().map((event) => event.text).join(),
+      isNot(contains('baseRevisionId')),
+    );
+    final revision = await storage.loadRevision(
+      'collection',
+      'doc_test',
+      card.revisionId!,
+    );
+    expect(revision!.sections.single.text, contains('Expanded explanation'));
+    expect(count, 2);
+  });
+
   test('AI edit tool creates a persistent pending revision', () async {
     var count = 0;
     final model = agent(

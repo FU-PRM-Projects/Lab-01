@@ -239,6 +239,7 @@ $initialEvidence
           1; // Initial retrieval counts against the whole-turn budget.
       for (var step = 0; step < 4 && !_isCancelled; step++) {
         yield ToolStatus('Consulting $chatModel...');
+        final answerBeforeStep = answer.toString();
         final canCallTools =
             step < 3 &&
             toolsUsed < 4 &&
@@ -269,7 +270,7 @@ $initialEvidence
             if (visibleTextEmitted) {
               answer.write(text);
               yield TextChunk(text);
-            } else if (!_couldBeDsml(stepText.toString())) {
+            } else if (!_couldBeToolPayload(stepText.toString())) {
               final visible = stepText.toString();
               answer.write(visible);
               yield TextChunk(visible);
@@ -285,9 +286,14 @@ $initialEvidence
         final dsmlCalls = message.toolCalls.isEmpty
             ? _parseDsmlToolCalls(stepText.toString())
             : const <AIChatMessageToolCall>[];
+        final jsonDraftCalls = message.toolCalls.isEmpty && dsmlCalls.isEmpty
+            ? _parseJsonDraftToolCalls(stepText.toString())
+            : const <AIChatMessageToolCall>[];
         final toolCalls = message.toolCalls.isNotEmpty
             ? message.toolCalls
-            : dsmlCalls;
+            : dsmlCalls.isNotEmpty
+            ? dsmlCalls
+            : jsonDraftCalls;
         if (toolCalls.isEmpty) {
           final text = stepText.toString();
           if (text.toUpperCase().contains('DSML')) {
@@ -319,7 +325,19 @@ $initialEvidence
           }
           break;
         }
-        if (!canCallTools) {
+        if (jsonDraftCalls.isNotEmpty) {
+          answer
+            ..clear()
+            ..write(answerBeforeStep);
+          final visible = _withoutJsonDraft(stepText.toString()).trim();
+          if (visible.isNotEmpty) {
+            if (answer.isNotEmpty && !answer.toString().endsWith('\n')) {
+              answer.writeln();
+            }
+            answer.write(visible);
+          }
+        }
+        if (!canCallTools && jsonDraftCalls.isEmpty) {
           throw StateError(
             'The model requested tools after the turn budget was exhausted',
           );
@@ -328,7 +346,7 @@ $initialEvidence
         // calls as DSML text, so convert those to canonical tool-call blocks
         // before appending tool results to the conversation.
         conversation.add(
-          dsmlCalls.isEmpty
+          dsmlCalls.isEmpty && jsonDraftCalls.isEmpty
               ? message
               : AIChatMessage.text('', toolCalls: toolCalls),
         );
@@ -732,13 +750,65 @@ $initialEvidence
   static String _sectionKey(String value) =>
       _foldText(value).replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
 
-  static bool _couldBeDsml(String text) {
+  static bool _couldBeToolPayload(String text) {
     final trimmed = text.trimLeft();
     if (trimmed.toUpperCase().contains('DSML')) return true;
+    if (trimmed.startsWith('{') || trimmed.startsWith('```json')) return true;
+    if (trimmed.contains('"baseRevisionId"') &&
+        trimmed.contains('"sectionName"')) {
+      return true;
+    }
     // A DSML control token can be split across several streaming chunks.
     // Hold a short leading tag until there is enough text to classify it.
     return trimmed.startsWith('<') && trimmed.length < 64;
   }
+
+  /// Some OpenRouter models print the intended section-edit arguments as a
+  /// JSON code block instead of emitting a native tool call. A revision id is
+  /// required here so an ordinary JSON answer containing `sectionName` and
+  /// `content` cannot accidentally mutate the paper.
+  static List<AIChatMessageToolCall> _parseJsonDraftToolCalls(String text) {
+    final match = RegExp(r'\{[\s\S]*\}').firstMatch(text);
+    if (match == null) return const [];
+    try {
+      final value = jsonDecode(match.group(0)!);
+      if (value is! Map<String, dynamic>) return const [];
+      final sectionName = value['sectionName'];
+      final revisedContent = value['revisedContent'] ?? value['content'];
+      final baseRevisionId = value['baseRevisionId'];
+      if (sectionName is! String ||
+          sectionName.trim().isEmpty ||
+          revisedContent is! String ||
+          revisedContent.trim().isEmpty ||
+          baseRevisionId is! String ||
+          baseRevisionId.trim().isEmpty) {
+        return const [];
+      }
+      final arguments = <String, dynamic>{
+        'sectionName': sectionName,
+        'revisedContent': revisedContent,
+        'baseRevisionId': baseRevisionId,
+        if (value['documentId'] is String) 'documentId': value['documentId'],
+        'instruction': value['instruction'] is String
+            ? value['instruction']
+            : 'Continue editing $sectionName',
+      };
+      return [
+        AIChatMessageToolCall(
+          id: 'json-draft-${DateTime.now().microsecondsSinceEpoch}',
+          name: 'save_section_draft',
+          argumentsRaw: jsonEncode(arguments),
+          arguments: arguments,
+        ),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static String _withoutJsonDraft(String text) => text
+      .replaceFirst(RegExp(r'```json\s*\{[\s\S]*?\}\s*```'), '')
+      .replaceFirst(RegExp(r'\{[\s\S]*\}'), '');
 
   /// Converts the textual DSML tool syntax emitted by a few OpenRouter models
   /// into the same canonical calls returned by providers with native tool
