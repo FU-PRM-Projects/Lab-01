@@ -82,12 +82,22 @@ Future<void> exportAllFigures(
       target: Directory(targetPath),
     );
     if (!context.mounted) return;
+    if (result.exported == 0) {
+      showAppSnackBar(
+        context,
+        'No figure images were found on disk, so nothing was exported. '
+        'Re-import the paper to extract its figures again.',
+        isError: true,
+      );
+      return;
+    }
     final missing = result.skipped == 0
         ? ''
-        : ' (${result.skipped} missing on disk were skipped)';
+        : ' (${_count(result.skipped, 'figure')} missing on disk skipped)';
     showAppSnackBar(
       context,
-      'Exported ${result.exported} figures to ${result.directory}$missing',
+      'Exported ${_count(result.exported, 'figure')} '
+      'to ${result.directory}$missing',
       isSuccess: true,
       duration: const Duration(seconds: 5),
     );
@@ -101,3 +111,6 @@ Future<void> exportAllFigures(
     }
   }
 }
+
+/// "1 figure", "3 figures".
+String _count(int n, String noun) => '$n ${n == 1 ? noun : '${noun}s'}';

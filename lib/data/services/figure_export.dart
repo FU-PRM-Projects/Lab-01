@@ -53,8 +53,9 @@ class FigureExportResult {
     required this.skipped,
   });
 
-  /// The folder the images and `figures.json` were written to.
-  final String directory;
+  /// The folder the images and `figures.json` were written to, or null when
+  /// there was nothing to export and no folder was created.
+  final String? directory;
   final int exported;
 
   /// Figures whose image file was missing from the data directory.
@@ -112,18 +113,24 @@ class FigureExporter {
     required PaperDocument paper,
     required Directory target,
   }) async {
+    final figures = figuresOf(collectionId, paper);
+    final onDisk = [
+      for (final figure in figures)
+        if (await File(figure.path).exists()) figure,
+    ];
+    final skipped = figures.length - onDisk.length;
+    // With no image to copy, a folder holding only figures.json would be
+    // a misleading export, so none is created.
+    if (onDisk.isEmpty) {
+      return FigureExportResult(directory: null, exported: 0, skipped: skipped);
+    }
+
     final dir = await _freshDirectory(target, '${slug(paper.title)}_figures');
     final entries = <Map<String, Object?>>[];
-    var skipped = 0;
 
-    for (final figure in figuresOf(collectionId, paper)) {
-      final source = File(figure.path);
-      if (!await source.exists()) {
-        skipped++;
-        continue;
-      }
+    for (final figure in onDisk) {
       final name = fileNameFor(paper.title, figure);
-      await source.copy(p.join(dir.path, name));
+      await File(figure.path).copy(p.join(dir.path, name));
       entries.add({
         'file': name,
         'number': figure.number,

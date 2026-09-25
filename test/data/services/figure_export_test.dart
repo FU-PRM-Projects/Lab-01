@@ -106,17 +106,17 @@ void main() {
 
     expect(result.exported, 2);
     expect(result.skipped, 0);
-    expect(p.basename(result.directory), 'attention_is_all_you_need_figures');
+    expect(p.basename(result.directory!), 'attention_is_all_you_need_figures');
     expect(
       File(
-        p.join(result.directory, 'attention_is_all_you_need_p3_fig1.png'),
+        p.join(result.directory!, 'attention_is_all_you_need_p3_fig1.png'),
       ).readAsBytesSync(),
       [1, 2, 3],
     );
 
     final manifest =
         jsonDecode(
-              File(p.join(result.directory, 'figures.json')).readAsStringSync(),
+              File(p.join(result.directory!, 'figures.json')).readAsStringSync(),
             )
             as Map<String, dynamic>;
     expect(manifest['paper']['title'], paper.title);
@@ -144,6 +144,21 @@ void main() {
     expect(first.exported, 1);
     expect(first.skipped, 1);
     expect(second.directory, isNot(first.directory));
-    expect(p.basename(second.directory), 'attention_is_all_you_need_figures_2');
+    expect(p.basename(second.directory!), 'attention_is_all_you_need_figures_2');
+  });
+
+  test('nothing on disk exports nothing and creates no folder', () async {
+    final target = Directory(p.join(tempDir.path, 'out'))..createSync();
+
+    final result = await exporter.exportAll(
+      collectionId: collectionId,
+      paper: paper,
+      target: target,
+    );
+
+    expect(result.exported, 0);
+    expect(result.skipped, 2);
+    expect(result.directory, isNull);
+    expect(target.listSync(), isEmpty);
   });
 }
