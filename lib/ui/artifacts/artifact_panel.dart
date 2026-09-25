@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -8,10 +10,12 @@ import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/citation.dart';
 import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/data/services/crossref_client.dart';
+import 'package:lab_05/data/services/figure_export.dart';
 import 'package:lab_05/data/models/document_section.dart';
 import 'package:lab_05/data/models/reference.dart';
 import 'package:lab_05/ui/artifacts/artifact_controller.dart';
 import 'package:lab_05/ui/collections/import_controller.dart';
+import 'package:lab_05/ui/core/figure_actions.dart';
 import 'package:lab_05/ui/core/markdown_math.dart';
 import 'package:lab_05/ui/core/snackbar.dart';
 import 'package:lab_05/ui/core/theme.dart';
@@ -264,9 +268,10 @@ class _PaperDetail extends ConsumerWidget {
     final sections = ref.watch(paperSectionsProvider(paper.id));
     final chunks = ref.watch(paperChunksProvider(paper.id));
     final references = ref.watch(paperReferencesProvider(paper.id));
+    final figureCount = paper.chunks.where((c) => c.isFigure).length;
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -335,6 +340,7 @@ class _PaperDetail extends ConsumerWidget {
                 Tab(height: 38, text: 'Sections  ${sections.length}'),
                 Tab(height: 38, text: 'Chunks  ${chunks.length}'),
                 Tab(height: 38, text: 'References  ${references.length}'),
+                Tab(height: 38, text: 'Figures  $figureCount'),
               ],
             ),
           ),
@@ -353,6 +359,7 @@ class _PaperDetail extends ConsumerWidget {
                   ),
                   _ChunkList(paper: paper, chunks: chunks),
                   _ReferenceList(paper: paper, references: references),
+                  _FigureGallery(paper: paper),
                 ],
               ),
             ),
@@ -1125,6 +1132,161 @@ class _LinkButton extends StatelessWidget {
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Every figure lifted out of the paper, as a grid of thumbnails. Tapping one
+/// opens it in the source panel, which shows it full size and can save it;
+/// "Export all" writes the whole set, with a `figures.json`, to a folder.
+class _FigureGallery extends ConsumerWidget {
+  final PaperDocument paper;
+
+  const _FigureGallery({required this.paper});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
+    final collection = ref.watch(currentCollectionProvider);
+    final exporter = FigureExporter(ref.watch(localStorageProvider));
+
+    if (collection == null) return const SizedBox.shrink();
+    final figures = exporter.figuresOf(collection.id, paper);
+
+    if (figures.isEmpty) {
+      return const _EmptyHint(
+        icon: Icons.image_not_supported_outlined,
+        title: 'No figures found',
+        message:
+            'No images large enough to be figures were found in this PDF. '
+            'Charts drawn as vector graphics cannot be extracted as images.',
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 10, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${figures.length} '
+                  '${figures.length == 1 ? 'figure' : 'figures'} extracted',
+                  style: textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => exportAllFigures(
+                  context,
+                  exporter: exporter,
+                  collectionId: collection.id,
+                  paper: paper,
+                ),
+                icon: const Icon(Icons.drive_folder_upload_outlined, size: 17),
+                label: const Text('Export all'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.95,
+            ),
+            itemCount: figures.length,
+            itemBuilder: (context, index) => _FigureTile(
+              figure: figures[index],
+              onTap: () {
+                ref.read(activeCitationProvider.notifier).state =
+                    citationForChunk(paper, figures[index].chunk);
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FigureTile extends StatelessWidget {
+  final PaperFigure figure;
+  final VoidCallback onTap;
+
+  const _FigureTile({required this.figure, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
+    final caption = figure.caption.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    return Material(
+      color: colorScheme.surfaceContainer,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Container(
+                color: colorScheme.surfaceContainerLowest,
+                padding: const EdgeInsets.all(6),
+                child: figure.exists
+                    ? Image.file(
+                        File(figure.path),
+                        fit: BoxFit.contain,
+                        // Decode at thumbnail size, not the full image.
+                        cacheWidth: 360,
+                        errorBuilder: (_, _, _) => Icon(
+                          Icons.broken_image_outlined,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      )
+                    : Icon(
+                        Icons.broken_image_outlined,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Figure ${figure.number} · p. ${figure.page}',
+                    style: textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (caption.isNotEmpty)
+                    Text(
+                      caption,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                ],
               ),
             ),
           ],
