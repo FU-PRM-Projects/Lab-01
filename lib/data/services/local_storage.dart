@@ -553,11 +553,8 @@ class LocalStorage {
     return revision;
   }
 
-  /// Starts an export review without writing Markdown or JSON files.
-  ///
-  /// The review is a pending revision cloned from the currently active
-  /// revision. Chat edits can branch from it, and files are only materialized
-  /// after the user explicitly saves the reviewed revision.
+  /// Starts an export review: a pending revision cloned from the active one.
+  /// Files are written only when the user saves the reviewed revision.
   Future<SectionRevision> createExportReview({
     required String collectionId,
     required PaperDocument paper,

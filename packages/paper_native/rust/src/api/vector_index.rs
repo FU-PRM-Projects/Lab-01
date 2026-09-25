@@ -159,9 +159,7 @@ mod tests {
 
     const DIM: usize = 128;
 
-    /// Deterministic pseudo-random unit-ish vectors. Quantized search needs
-    /// realistic dimensionality to be meaningful, so the fixtures are
-    /// generated rather than hand-written.
+    /// Deterministic pseudo-random test vectors.
     fn synth(n: usize, seed: u64) -> Vec<f32> {
         let mut state = seed | 1;
         (0..n * DIM)

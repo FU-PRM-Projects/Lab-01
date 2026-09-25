@@ -3,11 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:pdfrx/pdfrx.dart';
 
-/// Supplies one PDF's pages as images, one at a time.
-///
-/// The indexing pipeline only needs "how many pages" and "give me page N as a
-/// PNG", so it depends on this rather than on pdfrx directly — which also lets
-/// tests drive the pipeline without a real PDF.
+/// Supplies a PDF's page count and pages as PNGs (abstracted for tests).
 abstract class PdfPageImages {
   /// Opens [filePath] and returns its page count.
   Future<int> open(String filePath);

@@ -18,14 +18,8 @@ class PageTranscript {
   Map<String, dynamic> toJson() => {'page': page, 'text': text};
 }
 
-/// Every page of a document stitched into one Markdown string, keeping the
-/// span each page occupies so any character offset can be mapped back to the
-/// page it was printed on.
-///
-/// Two views of the same content are produced: [text] is the clean transcript
-/// that sections and chunks are cut from, and [markedMarkdown] interleaves
-/// `<!-- PAGE N -->` markers so the instruct model can report which page a
-/// heading starts on.
+/// All pages joined into one Markdown string, with per-page spans for offset lookup.
+/// [markedMarkdown] adds `<!-- PAGE N -->` markers for the instruct model.
 class DocumentTranscript {
   const DocumentTranscript._(
     this._starts,
@@ -119,9 +113,7 @@ class DocumentTranscript {
     return pages[found].page;
   }
 
-  /// Finds the offset of the line holding [heading], looking on [page] first
-  /// and then at its neighbours, because a model can be a page off when a
-  /// heading sits at a page boundary. Returns null when nothing matches.
+  /// Finds the line offset of [heading] on [page] or its neighbours; null if not found.
   int? findHeading(String heading, {required int page}) {
     final needle = normalizeHeading(heading);
     if (needle.isEmpty) return null;
@@ -133,11 +125,7 @@ class DocumentTranscript {
     return null;
   }
 
-  /// Finds the LAST page carrying [heading], without being told a page.
-  ///
-  /// Used as a safety net for the bibliography: if the outline missed the
-  /// "References" heading, the reference list would otherwise be lost, and it
-  /// is always the last such heading in the paper.
+  /// Finds the last page carrying [heading] (fallback for the references section).
   int? findLastHeading(String heading) {
     final needle = normalizeHeading(heading);
     if (needle.isEmpty) return null;

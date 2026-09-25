@@ -21,9 +21,7 @@ import 'package:lab_05/ui/core/markdown_math.dart';
 import 'package:lab_05/ui/core/snackbar.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
-/// Per-chat sidebar for the folder's one paper: the chunks it was indexed
-/// into, its outline and the works it cites. An empty folder shows the import
-/// instead.
+/// Per-chat panel for the folder's paper (chunks, outline, references); import when empty.
 class ArtifactPanel extends ConsumerWidget {
   final VoidCallback onImportPaper;
 
@@ -756,10 +754,7 @@ class _SectionRowState extends State<_SectionRow> {
   }
 }
 
-/// Styling for a section's expanded body text: matches the plain-text
-/// look the SelectableText it replaced had, but lets Markdown headings,
-/// emphasis, and (via mathInlineSyntaxes/mathBuilders) LaTeX formulas
-/// render instead of showing up as raw source.
+/// Markdown style for a section's expanded body (headings, emphasis, LaTeX).
 MarkdownStyleSheet _sectionMarkdownStyle(BuildContext context) {
   final colorScheme = context.colorScheme;
   final base = context.textTheme.bodySmall?.copyWith(
@@ -1073,9 +1068,7 @@ class _ReferenceRow extends StatelessWidget {
 
   Future<void> _open(BuildContext context, String url) async {
     final uri = Uri.tryParse(url);
-    // Reference URLs come out of imported documents, so only the web schemes
-    // are handed to the OS; a file: or custom-protocol link in a bibliography
-    // would otherwise invoke a registered handler on click.
+    // Only open web links; bibliography URLs come from untrusted documents.
     final isWeb =
         uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
     final launched =
@@ -1255,9 +1248,7 @@ class _LinkButton extends StatelessWidget {
   }
 }
 
-/// Every figure lifted out of the paper, as a grid of thumbnails. Tapping one
-/// opens it in the source panel, which shows it full size and can save it;
-/// "Export all" writes the whole set, with a `figures.json`, to a folder.
+/// Thumbnail grid of all extracted figures, with "Export all".
 class _FigureGallery extends ConsumerWidget {
   final PaperDocument paper;
 

@@ -32,11 +32,7 @@ class SourcePanel extends ConsumerStatefulWidget {
 }
 
 class _SourcePanelState extends ConsumerState<SourcePanel> {
-  /// The view the person picked, or null to follow the citation's default:
-  /// the image for a figure, the excerpt for text. Kept apart from the
-  /// default so a figure whose paper loads late still opens on its image,
-  /// while a deliberate choice is never overridden. The panel is keyed by
-  /// chunk id, so a different citation always starts with a fresh choice.
+  /// The view the user picked, or null to use the default (image for figures, else excerpt).
   _PanelView? _chosenView;
   bool _renderMarkdown = true;
   PdfViewerController? _pdfController;
@@ -186,9 +182,7 @@ class _SourcePanelState extends ConsumerState<SourcePanel> {
             color: colorScheme.surfaceContainerLow,
             child: Row(
               children: [
-                // The chips take whatever the view selector leaves, and a
-                // long section name is cut short instead of pushing the
-                // selector past the panel's edge.
+                // Chips take the remaining width; long section names are truncated.
                 Expanded(
                   child: Row(
                     children: [

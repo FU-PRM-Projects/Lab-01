@@ -3,13 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:lab_05/data/models/tool_call_record.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
-/// The agent's tool calls for one turn, oldest first.
-///
-/// Modelled on a coding-assistant transcript: a call is a quiet line of prose,
-/// not a panel. A lone call renders as one muted line with a chevron; several
-/// collapse into a "Ran N tools" group that opens into a hairline-divided
-/// list. The group stays open while a call is still running so progress is
-/// visible, then folds itself away once the turn settles.
+/// The agent's tool calls for one turn: a single line, or a collapsible "Ran N tools" group.
 class ToolCallLog extends StatefulWidget {
   const ToolCallLog({super.key, required this.calls});
 

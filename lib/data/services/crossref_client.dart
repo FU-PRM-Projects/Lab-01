@@ -84,10 +84,7 @@ class CrossrefMatch {
   };
 }
 
-/// Resolves raw bibliography strings to DOIs through the free Crossref API.
-///
-/// Crossref asks callers to identify themselves; no key or account is needed
-/// and nothing but the reference string itself leaves the machine.
+/// Resolves raw bibliography strings to DOIs via the free Crossref API.
 class CrossrefClient {
   static const String _userAgent =
       'PaperChat/1.0 (research reference resolver)';
@@ -142,9 +139,7 @@ class CrossrefClient {
       );
     }
 
-    // A response that does not carry a message/items envelope is a broken
-    // endpoint, not a paper Crossref does not know about. Reporting it as
-    // "no match" would hide an outage behind an empty bibliography.
+    // A missing message/items envelope means a broken endpoint, not "no match".
     final decoded = jsonDecode(response.body);
     if (decoded is! Map<String, dynamic>) {
       throw http.ClientException('Crossref returned a malformed body', uri);
@@ -191,9 +186,7 @@ class CrossrefClient {
       }
       onProgress?.call(++done, entries.length);
     }
-    // Every entry failing is an outage or a broken endpoint rather than a
-    // bibliography Crossref happens not to know, so the caller hears about it
-    // instead of being handed an empty result that looks like success.
+    // If every lookup failed, surface the error instead of an empty result.
     if (attempted > 0 && failed == attempted) throw lastError!;
     return results;
   }

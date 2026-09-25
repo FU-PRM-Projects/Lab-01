@@ -64,9 +64,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
   /// Reads the assembled transcript. Text-only models are fine here, and a
   /// long context matters more than vision.
   static const List<Map<String, String>> _availableIndexingModels = [
-    // The configured default belongs in the catalogue: _pick falls back to the
-    // first entry for anything it does not offer, so leaving it out makes Save
-    // rewrite the model without the dropdown ever showing a change.
+    // Keep the default model in the list so the dropdown matches the saved value.
     {
       'id': AppSettings.defaultIndexingModel,
       'name': 'GLM 5.3 FlashX',

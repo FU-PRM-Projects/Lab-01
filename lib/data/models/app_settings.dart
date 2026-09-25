@@ -7,9 +7,7 @@ class AppSettings {
   /// input; a text-only model cannot read a page image.
   final String transcriptionModel;
 
-  /// Instruct model that reads the assembled transcript and reports the
-  /// outline and bibliography. Text-only is fine, and a long context helps:
-  /// the whole paper goes in one request.
+  /// Instruct model that reads the full transcript to extract outline and bibliography.
   final String indexingModel;
 
   /// Reasoning effort sent with the outline pass; empty to omit it.
@@ -37,38 +35,15 @@ class AppSettings {
   static const String defaultIndexingModel = 'z-ai/glm-5.3-flashx';
 
   /// Reasoning budget for the outline pass.
-  ///
-  /// Reporting the headings a paper printed, and the page each starts on, is
-  /// reading rather than deduction: measured against the same transcript, the
-  /// minimal setting placed every heading on the right page. Kept separate
-  /// from [defaultReferenceReasoningEffort] so the two passes stay
-  /// independently tunable.
   static const String defaultIndexingReasoningEffort = 'minimal';
 
-  /// Reads the bibliography.
-  ///
-  /// Kept separate from [defaultIndexingModel] because the two jobs are not
-  /// alike: the outline needs a model that can hold a whole transcript in
-  /// view, while a reference window is short, highly patterned and wants
-  /// nothing but speed. A small fast model matches the large one field for
-  /// field here and returns in a few seconds rather than half a minute.
+  /// Small, fast model for the bibliography pass.
   static const String defaultReferenceModel = 'z-ai/glm-5.3-flashx';
 
-  /// Reasoning budget for the bibliography pass.
-  ///
-  /// Splitting a citation into its fields is pattern work, not deduction, so
-  /// thinking tokens buy nothing here and cost latency. `minimal` is the floor
-  /// on models that require reasoning at all; it is sent only when the model
-  /// advertises support, so a model without the parameter is unaffected.
+  /// Reasoning budget for the bibliography pass (sent only if the model supports it).
   static const String defaultReferenceReasoningEffort = 'minimal';
 
-  /// Carries the PDF parsing request.
-  ///
-  /// The `file-parser` plugin needs a model on the request, but the parsed
-  /// document comes back in an annotation and the model's own reply is thrown
-  /// away. So this wants to be the cheapest thing that can hold a request:
-  /// it is deliberately not [defaultChatModel], so that choosing an expensive
-  /// model for answer quality does not also raise the price of every import.
+  /// Cheap carrier model for the PDF `file-parser` request; its reply is discarded.
   static const String defaultOcrCarrierModel = 'google/gemini-2.5-flash-lite';
 
   const AppSettings({

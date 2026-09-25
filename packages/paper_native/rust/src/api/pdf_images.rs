@@ -1,16 +1,5 @@
-//! Lifts the raster images out of a PDF and hands back an image-free copy of
-//! the document.
-//!
-//! The indexing pipeline uploads papers to OpenRouter's `file-parser` plugin
-//! for OCR, which extracts at most 8 images per document. Pulling the figures
-//! out here removes that ceiling — every image is recovered, whatever the
-//! count — and the stripped PDF that goes up is a fraction of the original
-//! size, since raster figures dominate the byte count of a typical paper.
-//!
-//! Extracted images are *replaced* with a 1x1 white pixel rather than deleted.
-//! The `Do` operators in the content streams keep resolving, the page tree
-//! stays valid and the layout is untouched: the figure simply renders as blank
-//! space, which is exactly what the OCR pass should see.
+//! Extracts raster images from a PDF and returns a copy with them replaced by
+//! 1x1 white pixels, so OCR sees a small text-only PDF with the layout intact.
 
 use std::collections::{BTreeMap, HashSet};
 
@@ -46,12 +35,8 @@ pub struct StrippedPdf {
     pub skipped: u32,
 }
 
-/// Extracts every raster image at least `min_width` x `min_height` and returns
-/// the document with those images blanked out.
-///
-/// The size floor matters: papers are full of rule lines, logos, bullet glyphs
-/// and inline math bitmaps, and embedding those wastes tokens for no retrieval
-/// value. Images below the floor are left in the PDF untouched.
+/// Extracts every raster image at least `min_width` x `min_height` and blanks it out.
+/// Smaller images (rules, logos, glyphs) are left untouched.
 pub fn extract_and_strip_images(
     pdf_path: String,
     min_width: u32,
@@ -182,12 +167,7 @@ fn is_image(dict: &Dictionary) -> bool {
         .unwrap_or(false)
 }
 
-/// Turns one image XObject into bytes a browser or model can read.
-///
-/// A DCTDecode stream is already a JPEG file, so it is passed through
-/// untouched — no decode, no re-encode, no quality loss. Anything else is
-/// decompressed to raw samples and re-encoded as PNG, which needs the colour
-/// space to work out how many components each sample has.
+/// Decodes an image XObject: JPEG (DCTDecode) passes through, others become PNG.
 fn decode_image(doc: &Document, stream: &Stream) -> Option<(String, Vec<u8>)> {
     let filters = filter_names(&stream.dict);
 
@@ -221,9 +201,7 @@ fn decode_image(doc: &Document, stream: &Stream) -> Option<(String, Vec<u8>)> {
     }
     data.truncate(expected);
 
-    // CMYK has no PNG representation; convert to RGB first. PDF stores CMYK
-    // images inverted when an /Decode array says so, but the common case from
-    // a figure export is straight CMYK.
+    // CMYK has no PNG representation; convert to RGB first.
     let (color, pixels) = match components {
         1 => (ColorType::L8, data),
         3 => (ColorType::Rgb8, data),
@@ -236,9 +214,7 @@ fn decode_image(doc: &Document, stream: &Stream) -> Option<(String, Vec<u8>)> {
                     pixel[2] as u32,
                     pixel[3] as u32,
                 );
-                // DeviceCMYK samples are ink amounts: 0 means no ink, so each
-                // component is complemented before the black plate is applied.
-                // Multiplying the ink amounts directly turns white into black.
+                // CMYK samples are ink amounts, so complement before applying black.
                 rgb.push(((255 - c) * (255 - k) / 255) as u8);
                 rgb.push(((255 - m) * (255 - k) / 255) as u8);
                 rgb.push(((255 - y) * (255 - k) / 255) as u8);

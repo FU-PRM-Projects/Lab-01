@@ -133,20 +133,6 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.settings_outlined,
-                      size: 19,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    tooltip: 'Settings',
-                    onPressed: () {
-                      showDialog<void>(
-                        context: context,
-                        builder: (_) => const SettingsDialog(),
-                      );
-                    },
-                  ),
                 ],
               ),
             ),
@@ -335,58 +321,61 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          showDialog<void>(
-                            context: context,
-                            builder: (_) => const SettingsDialog(),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Local Workspace',
-                              style: textTheme.labelMedium?.copyWith(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w500,
-                                color: colorScheme.onSurface,
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                    color: apiKey.isNotEmpty
-                                        ? AppColors.success
-                                        : AppColors.warning,
-                                    shape: BoxShape.circle,
-                                  ),
+                      child: Tooltip(
+                        message: 'Settings',
+                        child: InkWell(
+                          onTap: () {
+                            showDialog<void>(
+                              context: context,
+                              builder: (_) => const SettingsDialog(),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Local Workspace',
+                                style: textTheme.labelMedium?.copyWith(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: colorScheme.onSurface,
                                 ),
-                                const SizedBox(width: 5),
-                                Flexible(
-                                  child: Text(
-                                    apiKey.isNotEmpty
-                                        ? 'OpenRouter Ready'
-                                        : 'Key Required',
-                                    style: textTheme.labelSmall?.copyWith(
-                                      fontSize: 11.5,
+                              ),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
                                       color: apiKey.isNotEmpty
                                           ? AppColors.success
                                           : AppColors.warning,
-                                      fontWeight: FontWeight.w500,
+                                      shape: BoxShape.circle,
                                     ),
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      apiKey.isNotEmpty
+                                          ? 'OpenRouter Ready'
+                                          : 'Key Required',
+                                      style: textTheme.labelSmall?.copyWith(
+                                        fontSize: 11.5,
+                                        color: apiKey.isNotEmpty
+                                            ? AppColors.success
+                                            : AppColors.warning,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

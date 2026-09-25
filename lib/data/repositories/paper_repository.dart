@@ -211,13 +211,7 @@ class PaperRepository {
             onProgress?.call(stage, 0.1 + 0.6 * progress),
       );
 
-      // 5. Save the figures and turn each into a chunk.
-      //
-      // A figure rides the same rails as a text passage from here on: it gets
-      // a vector id, goes into the same index and comes back from the same
-      // search. The only difference is that its vector is a joint embedding of
-      // the image and its caption, and that retrieval sends the image itself
-      // to the model.
+      // 5. Save the figures and turn each into a chunk (indexed like text passages).
       final figureChunks = await _saveFigures(
         collectionId: collectionId,
         documentId: documentId,
@@ -528,12 +522,8 @@ class PaperRepository {
     return chunks;
   }
 
-  /// Writes each figure next to its document and returns the chunks that
-  /// point at them.
-  ///
-  /// The chunk stores only the file name; the collection and document are
-  /// already known wherever it is read, and keeping the path relative means a
-  /// moved data directory does not strand every figure.
+  /// Writes each figure next to its document and returns chunks pointing at them
+  /// (file name only, so a moved data directory keeps working).
   Future<List<PaperChunk>> _saveFigures({
     required String collectionId,
     required String documentId,
@@ -557,9 +547,7 @@ class PaperRepository {
           page: figure.page,
           ordinal: i,
           section: figure.section,
-          // A figure occupies no span of the transcript; an empty span keeps
-          // it out of any offset-based lookup rather than pointing at text it
-          // did not come from.
+          // Figures occupy no transcript span.
           startChar: 0,
           endChar: 0,
           text: figure.embeddingText,

@@ -10,9 +10,7 @@ import 'package:lab_05/data/models/app_settings.dart';
 import 'package:lab_05/data/models/reference.dart';
 import 'package:lab_05/data/services/page_transcription_service.dart';
 
-/// A section heading the instruct model found, before it is anchored to the
-/// transcript. Only the heading is asked for — never the body — so the model
-/// cannot rewrite the paper's text.
+/// A section heading found by the instruct model (heading only, never body text).
 class SectionOutline {
   final String name;
   final int page;
@@ -53,9 +51,7 @@ class DocumentOutline {
   });
 }
 
-/// Raised when the model stopped because it ran out of output budget. The
-/// partial JSON is unusable, and the caller can react by asking for less at a
-/// time rather than surfacing a confusing parse error.
+/// Thrown when the model ran out of output budget and returned partial JSON.
 class InstructTruncatedException implements Exception {
   final String stage;
   final int maxTokens;
@@ -68,17 +64,11 @@ class InstructTruncatedException implements Exception {
       '$stage, so the JSON was cut off.';
 }
 
-/// Reads the assembled page transcripts with an OpenRouter instruct model.
+/// Reads page transcripts with an OpenRouter instruct model.
 ///
-/// The work is split across calls on purpose. A paper's outline is a few dozen
-/// headings, but its bibliography can be hundreds of entries — asking for both
-/// in one response overruns the model's output budget on any paper with a long
-/// reference list, and a truncated JSON object is worth nothing. So the
-/// outline comes back on its own, and the bibliography is extracted from just
-/// the references section, a window at a time.
-///
-/// No call ever asks for body text: the model returns headings, page numbers
-/// and citation fields, which is what keeps sections and chunks verbatim.
+/// The outline and the bibliography are extracted in separate calls (the
+/// bibliography window by window) so long reference lists never overrun the
+/// output budget. Body text is never requested, keeping sections verbatim.
 class InstructDocumentService {
   InstructDocumentService({
     required this.settings,
@@ -104,31 +94,16 @@ class InstructDocumentService {
   /// a window's entries fit well inside this.
   final int referencesMaxTokens;
 
-  /// How many bibliography windows are in flight at once.
-  ///
-  /// Each window costs more output tokens than input — the model re-emits the
-  /// entry verbatim in `raw` and again split into fields — so a window is
-  /// minutes of generation. Read serially, a long reference list dominates the
-  /// whole import, and the windows are independent, so they overlap the way
-  /// page transcription does — at the same width, since the two phases run one
-  /// after the other and never have requests in flight at the same time.
+  /// How many bibliography windows run concurrently.
   final int maxConcurrentWindows;
 
   final http.Client _client;
   final _abort = Completer<void>();
 
-  /// How many times a window may be halved and retried after the model
-  /// truncates or returns unparseable JSON. Three levels turns one window into
-  /// at most eight, which is far past any real reference list.
+  /// How many times a window may be halved and retried on truncated/invalid JSON.
   static const maxBibliographyRetries = 3;
 
-  /// How much bibliography text to send per call. Roughly 20 entries, which
-  /// come back as roughly 2.5k tokens of JSON — comfortably under
-  /// [referencesMaxTokens] even when every entry carries a DOI and a URL.
-  ///
-  /// Kept well under the output cap on purpose: windows run concurrently, so
-  /// smaller ones parallelise better, and a window that never truncates never
-  /// pays for the halve-and-retry in [_referencesIn].
+  /// Bibliography text per call (~20 entries), kept well under [referencesMaxTokens].
   static const bibliographyWindowChars = 6000;
 
   String get endpoint => settings.chatCompletionsUrl;
@@ -227,13 +202,8 @@ Output ONLY the JSON object.''';
     return parseOutline(text);
   }
 
-  /// Second pass: the bibliography, read from the references section alone.
-  ///
-  /// [bibliographyText] is split into windows so a long reference list cannot
-  /// overrun the output budget; entries are renumbered in order across the
-  /// windows, since the model only sees one window at a time.
-  /// [onProgress] reports how many windows have *finished*, so it starts at 0
-  /// and reaches [windowCount] only when the bibliography is complete.
+  /// Second pass: extracts the bibliography window by window, renumbering entries.
+  /// [onProgress] reports finished windows (0..[windowCount]).
   Future<List<PaperReference>> extractReferences(
     String bibliographyText, {
     required String modelId,
@@ -296,12 +266,7 @@ Output ONLY the JSON object.''';
     return references;
   }
 
-  /// Reads one window, halving it and retrying if the model truncates or
-  /// returns JSON that will not parse.
-  ///
-  /// Both failures mean the same thing in practice — the model was asked for
-  /// more than it could produce in one response — and both are fixed by asking
-  /// for less, so the import recovers instead of failing outright.
+  /// Reads one window, halving and retrying if the model truncates or returns bad JSON.
   Future<List<PaperReference>> _referencesIn(
     String window,
     String modelId, {

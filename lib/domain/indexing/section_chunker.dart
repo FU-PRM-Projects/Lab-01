@@ -2,16 +2,8 @@ import 'package:lab_05/data/models/document_section.dart';
 import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/domain/indexing/document_transcript.dart';
 
-/// Cuts retrieval chunks out of resolved sections.
-///
-/// Chunking runs per section, never across one, so a chunk never mixes two
-/// parts of the paper and can always name the section it came from. Within a
-/// section the split prefers a paragraph break, then a sentence end, then a
-/// word boundary, and consecutive chunks overlap so a passage straddling a
-/// boundary is still retrievable whole.
-///
-/// Offsets are absolute in [DocumentTranscript.text], which is what makes a
-/// chunk addressable back to a page.
+/// Splits resolved sections into overlapping retrieval chunks, never across sections.
+/// Offsets are absolute in [DocumentTranscript.text].
 class SectionChunker {
   /// Preferred chunk size. Chosen to sit comfortably inside embedding model
   /// context while still carrying a few paragraphs of argument.
@@ -32,12 +24,7 @@ class SectionChunker {
 
   static final _sentenceEnd = RegExp(r'[.!?]["”’)]?\s');
 
-  /// Chunks every section in reading order.
-  ///
-  /// The bibliography is skipped unless [indexReferences] is set: its entries
-  /// are stored as structured [PaperReference]s for the reference view and the
-  /// validating agent, and embedding them as prose mostly returns citation
-  /// lists for unrelated queries.
+  /// Chunks every section in reading order; skips the bibliography unless [indexReferences].
   static List<PaperChunk> chunk({
     required String documentId,
     required DocumentTranscript transcript,

@@ -7,11 +7,7 @@ SectionKind parseSectionKind(String? kind) {
       SectionKind.body;
 }
 
-/// One section of a paper, resolved against the page transcripts so it owns a
-/// concrete span of the document text.
-///
-/// Sections are the unit the details view renders; [PaperChunk]s are cut out of
-/// them for retrieval, so every chunk can name the section it came from.
+/// A paper section resolved to a concrete span of the page transcripts.
 class DocumentSection {
   /// `<documentId>:s<ordinal>`.
   final String id;

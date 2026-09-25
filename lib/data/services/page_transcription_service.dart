@@ -8,16 +8,8 @@ import 'package:http/retry.dart';
 
 import 'package:lab_05/data/models/app_settings.dart';
 
-/// Transcribes rendered PDF pages to Markdown with a multimodal model on
-/// OpenRouter.
-///
-/// Every page goes through the model, scanned or born-digital, so the
-/// transcript has one consistent shape and page numbers stay exact — the page
-/// image is the only input, so page N of the transcript is page N of the PDF.
-///
-/// HTTP setup follows [EmbeddingClient]: the same retry policy (429 and 5xx,
-/// two retries), abortable requests, and [HttpException] carrying the status
-/// code and message for non-200 responses.
+/// Transcribes rendered PDF pages to Markdown with a multimodal OpenRouter model.
+/// Uses the same retry policy as [EmbeddingClient].
 class PageTranscriptionService {
   PageTranscriptionService({
     required this.settings,
@@ -34,10 +26,7 @@ class PageTranscriptionService {
   final AppSettings settings;
   final Duration timeout;
 
-  /// Output cap per page. Without it OpenRouter reserves the model's full
-  /// output limit (65k-131k tokens) and rejects the call with 402 when the
-  /// account balance cannot cover that reservation. A dense page of Markdown
-  /// is typically well under this.
+  /// Output token cap per page (avoids 402s from reserving the model's full limit).
   final int maxTokens;
   final http.Client _client;
   final _abort = Completer<void>();
