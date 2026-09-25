@@ -11,25 +11,18 @@ import 'package:lab_05/data/services/crossref_client.dart';
 import 'package:lab_05/data/models/document_section.dart';
 import 'package:lab_05/data/models/reference.dart';
 
-/// Which artifact the panel is showing, for one chat.
+/// Whether the artifact panel is open, for one chat.
+///
+/// A folder holds one paper, so the panel has nothing to select: it only
+/// opens and closes.
 class ArtifactPanelView {
   final bool isOpen;
-  final String? selectedPaperId;
 
-  const ArtifactPanelView({this.isOpen = false, this.selectedPaperId});
-
-  ArtifactPanelView copyWith({bool? isOpen, String? selectedPaperId}) {
-    return ArtifactPanelView(
-      isOpen: isOpen ?? this.isOpen,
-      selectedPaperId: selectedPaperId ?? this.selectedPaperId,
-    );
-  }
-
-  ArtifactPanelView clearSelection() => ArtifactPanelView(isOpen: isOpen);
+  const ArtifactPanelView({this.isOpen = false});
 }
 
 /// Panel state keyed by chat, so every conversation keeps its own artifact
-/// sidebar: which papers list it is on, and which one is open.
+/// sidebar open or closed.
 class ArtifactPanelNotifier
     extends StateNotifier<Map<String, ArtifactPanelView>> {
   ArtifactPanelNotifier() : super(const {});
@@ -37,37 +30,15 @@ class ArtifactPanelNotifier
   ArtifactPanelView viewFor(String scope) =>
       state[scope] ?? const ArtifactPanelView();
 
-  void _set(String scope, ArtifactPanelView view) {
-    state = {...state, scope: view};
+  void _set(String scope, bool isOpen) {
+    state = {...state, scope: ArtifactPanelView(isOpen: isOpen)};
   }
 
-  void toggle(String scope) {
-    final view = viewFor(scope);
-    _set(scope, view.copyWith(isOpen: !view.isOpen));
-  }
+  void toggle(String scope) => _set(scope, !viewFor(scope).isOpen);
 
-  void open(String scope, {String? paperId}) {
-    final view = viewFor(scope);
-    _set(
-      scope,
-      ArtifactPanelView(
-        isOpen: true,
-        selectedPaperId: paperId ?? view.selectedPaperId,
-      ),
-    );
-  }
+  void open(String scope) => _set(scope, true);
 
-  void close(String scope) {
-    _set(scope, viewFor(scope).copyWith(isOpen: false));
-  }
-
-  void select(String scope, String paperId) {
-    _set(scope, ArtifactPanelView(isOpen: true, selectedPaperId: paperId));
-  }
-
-  void clearSelection(String scope) {
-    _set(scope, viewFor(scope).clearSelection());
-  }
+  void close(String scope) => _set(scope, false);
 
   void forget(String scope) {
     if (!state.containsKey(scope)) return;

@@ -124,14 +124,48 @@ class MathDisplayBuilder extends MarkdownElementBuilder {
   }
 }
 
-/// Pass as a `MarkdownBody`'s `blockSyntaxes` (merge with any others).
-final List<md.BlockSyntax> mathBlockSyntaxes = [const MathDisplaySyntax()];
+final List<md.BlockSyntax> _mathBlockSyntaxes = [const MathDisplaySyntax()];
 
-/// Pass as a `MarkdownBody`'s `inlineSyntaxes` (merge with any others).
-final List<md.InlineSyntax> mathInlineSyntaxes = [MathInlineSyntax()];
+final List<md.InlineSyntax> _mathInlineSyntaxes = [MathInlineSyntax()];
 
-/// Merge into a `MarkdownBody`'s `builders` (keys must stay unique).
-final Map<String, MarkdownElementBuilder> mathBuilders = {
+final Map<String, MarkdownElementBuilder> _mathBuilders = {
   'math_display': MathDisplayBuilder(),
   'math_inline': MathInlineBuilder(),
 };
+
+/// A [MarkdownBody] that also renders `$...$` and `$$...$$` as TeX.
+///
+/// Every Markdown view in the app goes through this, so the math syntaxes
+/// are registered in one place. A view that needs its own syntax (the source
+/// panel's underline) passes it in [extraInlineSyntaxes] and [extraBuilders].
+class MathMarkdown extends StatelessWidget {
+  const MathMarkdown({
+    super.key,
+    required this.data,
+    this.styleSheet,
+    this.selectable = false,
+    this.onTapLink,
+    this.extraInlineSyntaxes = const [],
+    this.extraBuilders = const {},
+  });
+
+  final String data;
+  final MarkdownStyleSheet? styleSheet;
+  final bool selectable;
+  final MarkdownTapLinkCallback? onTapLink;
+  final List<md.InlineSyntax> extraInlineSyntaxes;
+  final Map<String, MarkdownElementBuilder> extraBuilders;
+
+  @override
+  Widget build(BuildContext context) {
+    return MarkdownBody(
+      data: data,
+      selectable: selectable,
+      styleSheet: styleSheet,
+      blockSyntaxes: _mathBlockSyntaxes,
+      inlineSyntaxes: [..._mathInlineSyntaxes, ...extraInlineSyntaxes],
+      builders: {..._mathBuilders, ...extraBuilders},
+      onTapLink: onTapLink,
+    );
+  }
+}

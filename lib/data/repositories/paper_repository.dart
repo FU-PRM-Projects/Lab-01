@@ -24,6 +24,19 @@ typedef IndexingPipelineFactory = IndexingPipeline Function(
   AppSettings settings,
 );
 
+/// Thrown when a paper is imported into a folder that already holds one.
+class FolderOccupiedException implements Exception {
+  FolderOccupiedException(this.paperTitle);
+
+  /// Title of the paper already in the folder.
+  final String paperTitle;
+
+  @override
+  String toString() =>
+      'This folder already holds "$paperTitle". '
+      'Create a new folder to import another paper.';
+}
+
 class PaperRepository {
   PaperRepository({
     required this.storage,
@@ -146,6 +159,18 @@ class PaperRepository {
     if (duplicate != null) {
       onProgress?.call('Paper already imported', 1.0);
       return duplicate;
+    }
+
+    // A folder holds exactly one paper. The UI hides every import entry once
+    // the slot is taken; this check keeps the rule for any other caller.
+    final occupant = existingPapers.where((p) => p.occupiesFolder).firstOrNull;
+    if (occupant != null) {
+      throw FolderOccupiedException(occupant.title);
+    }
+    // A failed or abandoned import is replaced rather than kept beside the
+    // new paper, so the folder never lists more than one document.
+    for (final leftover in existingPapers) {
+      await deletePaper(leftover.id);
     }
 
     // 2. Generate new document ID and copy PDF to collection documents folder

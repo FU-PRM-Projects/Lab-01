@@ -7,9 +7,7 @@ import 'package:lab_05/ui/chat/chat_controller.dart';
 import 'package:lab_05/ui/core/theme.dart';
 
 class CodexComposer extends ConsumerStatefulWidget {
-  final VoidCallback onImportPaper;
-
-  const CodexComposer({super.key, required this.onImportPaper});
+  const CodexComposer({super.key});
 
   @override
   ConsumerState<CodexComposer> createState() => _CodexComposerState();
@@ -152,26 +150,8 @@ class _CodexComposerState extends ConsumerState<CodexComposer> {
                 padding: const EdgeInsets.fromLTRB(8, 2, 10, 8),
                 child: Row(
                   children: [
-                    // Attach a source to the active workspace
-                    TextButton.icon(
-                      onPressed: collection == null
-                          ? null
-                          : widget.onImportPaper,
-                      icon: const Icon(Icons.attach_file_rounded, size: 16),
-                      label: const Text('Add PDF'),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        foregroundColor: colorScheme.onSurfaceVariant,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-
+                    // A folder holds one paper, imported when the folder is
+                    // created, so the composer carries no "add source" button.
                     const Spacer(),
 
                     Text(

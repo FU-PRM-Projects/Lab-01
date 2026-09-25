@@ -92,7 +92,7 @@ void main() {
                     'type': 'function',
                     'function': {
                       'name': 'read_page',
-                      'arguments': '{"documentId":"doc_',
+                      'arguments': '{"pa',
                     },
                   },
                 ],
@@ -101,7 +101,7 @@ void main() {
                 'tool_calls': [
                   {
                     'index': 0,
-                    'function': {'arguments': 'test","page":1}'},
+                    'function': {'arguments': 'ge":1}'},
                   },
                 ],
               },
@@ -149,7 +149,7 @@ void main() {
                   'type': 'function',
                   'function': {
                     'name': 'read_page',
-                    'arguments': '{"documentId":"doc_test","page":1}',
+                    'arguments': '{"page":1}',
                   },
                 },
                 {
@@ -158,7 +158,7 @@ void main() {
                   'type': 'function',
                   'function': {
                     'name': 'read_page',
-                    'arguments': '{"documentId":"doc_test","page":99}',
+                    'arguments': '{"page":99}',
                   },
                 },
               ],
@@ -196,7 +196,7 @@ void main() {
     expect(retrieval.durationMs, isNotNull);
 
     final page = finished[1].call;
-    expect(page.arguments, {'documentId': 'doc_test', 'page': 1});
+    expect(page.arguments, {'page': 1});
     expect(page.summary, '1 passage');
     expect(page.resultPreview, contains('Exact evidence'));
 
@@ -458,7 +458,10 @@ void main() {
                     'index': i,
                     'id': 'call-$i',
                     'type': 'function',
-                    'function': {'name': 'list_papers', 'arguments': '{}'},
+                    'function': {
+                      'name': 'read_page',
+                      'arguments': '{"page":1}',
+                    },
                   },
               ],
             },

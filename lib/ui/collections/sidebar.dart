@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/chat.dart';
 import 'package:lab_05/data/models/collection.dart';
+import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/ui/artifacts/artifact_controller.dart';
 import 'package:lab_05/ui/chat/chat_controller.dart';
 import 'package:lab_05/ui/collections/import_controller.dart';
+import 'package:lab_05/ui/core/snackbar.dart';
 import 'package:lab_05/ui/core/theme.dart';
 import 'package:lab_05/ui/settings/settings_dialog.dart';
 
@@ -30,14 +32,9 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
   String? _hoveredChatId;
   bool _isFooterHovered = false;
 
-  void _toggleTheme() {
-    final settings = ref.read(settingsProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final nextTheme = isDark ? 'light' : 'dark';
-    ref
-        .read(settingsProvider.notifier)
-        .update(settings.copyWith(theme: nextTheme));
-  }
+  void _toggleTheme() => ref
+      .read(settingsProvider.notifier)
+      .toggleTheme(Theme.of(context).brightness);
 
   Future<void> _selectCollection(Collection collection) async {
     await ref.read(chatControllerProvider.notifier).stop();
@@ -68,8 +65,10 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
           .update(settings.copyWith(pinnedCollectionIds: pinnedIds.toList()));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update pinned projects: $error')),
+      showAppSnackBar(
+        context,
+        'Could not update pinned projects: $error',
+        isError: true,
       );
     }
   }
@@ -430,6 +429,11 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
   }) {
     final isSelected = currentCol?.id == col.id;
     final isExpanded = _expandedCollections.contains(col.id) || isSelected;
+    // A folder holds one paper, so "Import PDF Paper" is offered only while
+    // this folder has none (or its only import failed).
+    final canImportHere = !ref
+        .watch(projectPapersProvider(col.id))
+        .any((paper) => paper.occupiesFolder);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -624,17 +628,18 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                             ],
                           ),
                         ),
-                        const PopupMenuItem(
-                          value: 'import',
-                          height: 38,
-                          child: Row(
-                            children: [
-                              Icon(Icons.upload_file, size: 16),
-                              SizedBox(width: 8),
-                              Text('Import PDF Paper'),
-                            ],
+                        if (canImportHere)
+                          const PopupMenuItem(
+                            value: 'import',
+                            height: 38,
+                            child: Row(
+                              children: [
+                                Icon(Icons.upload_file, size: 16),
+                                SizedBox(width: 8),
+                                Text('Import PDF Paper'),
+                              ],
+                            ),
                           ),
-                        ),
                         const PopupMenuItem(
                           value: 'rename',
                           height: 38,
@@ -894,6 +899,8 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
     ref.read(currentChatProvider.notifier).state = null;
     ref.read(activeCitationProvider.notifier).state = null;
     ref.read(currentCollectionProvider.notifier).state = newCol;
+    // No picker opens here: a new folder can stay empty until the user
+    // chooses to import its paper from the empty state or the folder menu.
   }
 
   void _promptRenameCollection(BuildContext context, Collection col) {

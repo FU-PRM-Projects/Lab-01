@@ -98,12 +98,6 @@ class DocumentTranscript {
     return _starts[index];
   }
 
-  /// Offset just past the end of [page], clamped into range.
-  int endOfPage(int page) {
-    final index = _indexOfPage(page);
-    return index == null ? length : _ends[index];
-  }
-
   /// The 1-based page an [offset] into [text] falls on.
   int pageForOffset(int offset) {
     if (pages.isEmpty) return 1;

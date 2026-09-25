@@ -353,16 +353,16 @@ $initialEvidence
           summary: _passageSummary(chunks.length),
         );
       case 'read_page':
-        final documentId = call.arguments['documentId'];
+        // A folder holds one paper, so a page number is all the model needs.
         final page = call.arguments['page'];
-        if (documentId is! String || page is! int) {
-          return _ToolOutcome.rejected(
-            'documentId and an integer page are required.',
-          );
+        if (page is! int) {
+          return _ToolOutcome.rejected('An integer page is required.');
         }
-        final paper = evidence.papers[documentId];
-        if (paper == null || paper.status != DocumentStatus.ready) {
-          return _ToolOutcome.rejected('Document is not available.');
+        final paper = evidence.papers.values
+            .where((paper) => paper.status == DocumentStatus.ready)
+            .firstOrNull;
+        if (paper == null) {
+          return _ToolOutcome.rejected('The paper is not available.');
         }
         if (page < 1 || page > paper.pageCount) {
           return _ToolOutcome.rejected('Page is outside this document.');
@@ -811,7 +811,7 @@ $initialEvidence
   static const _tools = [
     ToolSpec(
       name: 'search_papers',
-      description: 'Search the current collection for relevant passages.',
+      description: 'Search the paper for relevant passages.',
       inputJsonSchema: {
         'type': 'object',
         'properties': {
@@ -870,8 +870,8 @@ $initialEvidence
     ToolSpec(
       name: 'export_sections',
       description:
-          'Create reusable section artifacts for a paper as Markdown, JSON, '
-          'or both, and return their saved local paths.',
+          'Create a review draft for paper sections as Markdown, JSON, or both. '
+          'No file is written until the user approves and saves the review.',
       inputJsonSchema: {
         'type': 'object',
         'properties': {
