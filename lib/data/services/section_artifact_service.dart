@@ -22,6 +22,17 @@ class SectionArtifactBundle {
 class SectionArtifactService {
   static const schemaVersion = 1;
 
+  /// Removes YAML front matter for the human-readable in-app preview.
+  /// The saved Markdown keeps it for provenance and reproducibility; the JSON
+  /// tab exposes the same metadata in a format intended for inspection.
+  static String readableMarkdown(String markdown) {
+    final lines = markdown.split('\n');
+    if (lines.isEmpty || lines.first.trim() != '---') return markdown;
+    final closing = lines.indexWhere((line) => line.trim() == '---', 1);
+    if (closing == -1) return markdown;
+    return lines.skip(closing + 1).join('\n').trimLeft();
+  }
+
   static SectionArtifactBundle build(
     PaperDocument paper, {
     String? revisionId,

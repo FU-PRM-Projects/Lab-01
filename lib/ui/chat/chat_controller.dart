@@ -120,20 +120,53 @@ class ChatController extends StateNotifier<ChatState> {
             .createNewChat(title);
       }
       if (!_isCurrent(generation)) return;
-      final history = chat.messages
-          .map(
-            (message) => {
-              'role': message.role,
-              'content': [
-                message.content,
-                for (final artifact in message.artifacts)
-                  if (artifact.revisionId != null)
-                    '[${artifact.status ?? 'saved'} ${artifact.type}: '
-                        '${artifact.revisionId}]',
-              ].where((part) => part.isNotEmpty).join('\n'),
-            },
-          )
-          .toList();
+      final history = <Map<String, String>>[];
+      for (final message in chat.messages) {
+        final parts = <String>[message.content];
+        for (final artifact in message.artifacts) {
+          final revisionId = artifact.revisionId;
+          if (revisionId == null) continue;
+          parts.add(
+            '[${artifact.status ?? 'saved'} ${artifact.type} '
+            'revisionId=$revisionId documentId=${artifact.documentId} '
+            'title="${artifact.title}"]',
+          );
+          if (artifact.type == 'sectionChangeDraft' &&
+              artifact.status == 'pending') {
+            final revision = await storage.loadRevision(
+              collection.id,
+              artifact.documentId,
+              revisionId,
+            );
+            final parentId = revision?.parentRevisionId;
+            final parent = parentId == null
+                ? null
+                : await storage.loadRevision(
+                    collection.id,
+                    artifact.documentId,
+                    parentId,
+                  );
+            if (revision != null) {
+              final parentText = {
+                for (final section in parent?.sections ?? const [])
+                  section.id: section.text,
+              };
+              for (final section in revision.sections) {
+                if (parentText[section.id] != section.text) {
+                  parts.add(
+                    'Pending draft for "${section.displayName}":\n'
+                    '${section.text}',
+                  );
+                }
+              }
+            }
+          }
+        }
+        history.add({
+          'role': message.role,
+          'content': parts.where((part) => part.isNotEmpty).join('\n'),
+        });
+      }
       final updated = chat.copyWith(
         messages: [
           ...chat.messages,
@@ -367,7 +400,7 @@ class ChatController extends StateNotifier<ChatState> {
 
   Future<void> saveDraftRevision(ChatArtifact draft) async {
     final revisionId = draft.revisionId;
-    if (revisionId == null || draft.type != 'sectionDraft') return;
+    if (revisionId == null || !_isPendingDraft(draft)) return;
     if (state.isStreaming) {
       throw StateError('Wait for the current response to finish first.');
     }
@@ -470,7 +503,7 @@ class ChatController extends StateNotifier<ChatState> {
 
   Future<void> discardDraftRevision(ChatArtifact draft) async {
     final revisionId = draft.revisionId;
-    if (revisionId == null || draft.type != 'sectionDraft') return;
+    if (revisionId == null || !_isPendingDraft(draft)) return;
     final collection = _ref.read(currentCollectionProvider);
     if (collection == null) return;
     await _ref
@@ -553,8 +586,7 @@ class ChatController extends StateNotifier<ChatState> {
       final supersededRevisionIds = turn.artifacts
           .where(
             (artifact) =>
-                artifact.type == 'sectionDraft' &&
-                artifact.parentRevisionId != null,
+                _isPendingDraft(artifact) && artifact.parentRevisionId != null,
           )
           .map((artifact) => artifact.parentRevisionId!)
           .toSet();
@@ -565,7 +597,7 @@ class ChatController extends StateNotifier<ChatState> {
             message.copyWith(
               artifacts: [
                 for (final artifact in message.artifacts)
-                  if (artifact.type == 'sectionDraft' &&
+                  if (_isPendingDraft(artifact) &&
                       supersededRevisionIds.contains(artifact.revisionId))
                     artifact.copyWith(status: 'superseded')
                   else
@@ -603,6 +635,9 @@ class ChatController extends StateNotifier<ChatState> {
     }
     if (_isCurrent(generation)) state = ChatState(errorMessage: error);
   }
+
+  static bool _isPendingDraft(ChatArtifact artifact) =>
+      artifact.type == 'sectionDraft' || artifact.type == 'sectionChangeDraft';
 }
 
 class _ChatTurn {

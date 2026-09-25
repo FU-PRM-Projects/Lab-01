@@ -50,6 +50,10 @@ void main() {
     expect(bundle.markdown, contains('artifact_type: "paper-sections"'));
     expect(bundle.markdown, contains('Exact body with \$x^2\$.'));
     expect(bundle.markdown, contains('Rows stay verbatim.'));
+    final readable = SectionArtifactService.readableMarkdown(bundle.markdown);
+    expect(readable, startsWith('<!-- SECTION'));
+    expect(readable, isNot(contains('schema_version:')));
+    expect(readable, contains('## 2 Methods'));
 
     final sections = bundle.json['sections'] as List<dynamic>;
     expect(sections, hasLength(2));

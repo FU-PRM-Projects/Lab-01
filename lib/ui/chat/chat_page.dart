@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -773,6 +774,237 @@ class _SavingArtifactCard extends StatelessWidget {
 
 enum _ArtifactSaveChoice { markdown, json, both }
 
+class _SectionDiff {
+  final String title;
+  final String before;
+  final String after;
+
+  const _SectionDiff({
+    required this.title,
+    required this.before,
+    required this.after,
+  });
+}
+
+enum _DiffKind { unchanged, removed, added }
+
+class _DiffLine {
+  final _DiffKind kind;
+  final String text;
+  final int? oldNumber;
+  final int? newNumber;
+
+  const _DiffLine(this.kind, this.text, this.oldNumber, this.newNumber);
+}
+
+class _SectionDiffView extends StatelessWidget {
+  final List<_SectionDiff> changes;
+
+  const _SectionDiffView({required this.changes});
+
+  @override
+  Widget build(BuildContext context) {
+    if (changes.isEmpty) {
+      return const Center(child: Text('No changed lines.'));
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      itemCount: changes.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        final change = changes[index];
+        final lines = _buildLineDiff(change.before, change.after);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.difference_outlined, size: 17),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      change.title,
+                      style: Theme.of(context).textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.symmetric(
+                  horizontal: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: 1100,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final line in lines) _DiffLineRow(line: line),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DiffLineRow extends StatelessWidget {
+  final _DiffLine line;
+
+  const _DiffLineRow({required this.line});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final (background, stripe, marker) = switch (line.kind) {
+      _DiffKind.removed => (
+        colors.errorContainer.withValues(alpha: 0.58),
+        colors.error,
+        '−',
+      ),
+      _DiffKind.added => (
+        const Color(0xFF2DA44E).withValues(alpha: 0.14),
+        const Color(0xFF2DA44E),
+        '+',
+      ),
+      _ => (Colors.transparent, colors.outlineVariant, ' '),
+    };
+    final numberStyle = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 12,
+      color: colors.onSurfaceVariant,
+    );
+    return Container(
+      constraints: const BoxConstraints(minHeight: 25),
+      decoration: BoxDecoration(
+        color: background,
+        border: Border(left: BorderSide(color: stripe, width: 3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 45,
+            child: Text(
+              line.oldNumber?.toString() ?? '',
+              textAlign: TextAlign.right,
+              style: numberStyle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 45,
+            child: Text(
+              line.newNumber?.toString() ?? '',
+              textAlign: TextAlign.right,
+              style: numberStyle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 18,
+            child: Text(marker, style: numberStyle.copyWith(color: stripe)),
+          ),
+          Expanded(
+            child: SelectableText(
+              line.text.isEmpty ? ' ' : line.text,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12.5,
+                height: 1.45,
+                color: colors.onSurface,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
+    );
+  }
+}
+
+List<_DiffLine> _buildLineDiff(String before, String after) {
+  final oldLines = before.split('\n');
+  final newLines = after.split('\n');
+  final width = newLines.length + 1;
+  // A section can occasionally contain a very large generated block. Keep the
+  // preview responsive instead of allocating an unbounded LCS table.
+  if (oldLines.length * newLines.length > 750000) {
+    return [
+      for (var i = 0; i < oldLines.length; i++)
+        _DiffLine(_DiffKind.removed, oldLines[i], i + 1, null),
+      for (var i = 0; i < newLines.length; i++)
+        _DiffLine(_DiffKind.added, newLines[i], null, i + 1),
+    ];
+  }
+  final table = Uint32List((oldLines.length + 1) * width);
+  for (var oldIndex = oldLines.length - 1; oldIndex >= 0; oldIndex--) {
+    for (var newIndex = newLines.length - 1; newIndex >= 0; newIndex--) {
+      final at = oldIndex * width + newIndex;
+      table[at] = oldLines[oldIndex] == newLines[newIndex]
+          ? table[(oldIndex + 1) * width + newIndex + 1] + 1
+          : table[(oldIndex + 1) * width + newIndex] >=
+                table[oldIndex * width + newIndex + 1]
+          ? table[(oldIndex + 1) * width + newIndex]
+          : table[oldIndex * width + newIndex + 1];
+    }
+  }
+  final result = <_DiffLine>[];
+  var oldIndex = 0;
+  var newIndex = 0;
+  while (oldIndex < oldLines.length && newIndex < newLines.length) {
+    if (oldLines[oldIndex] == newLines[newIndex]) {
+      result.add(
+        _DiffLine(
+          _DiffKind.unchanged,
+          oldLines[oldIndex],
+          oldIndex + 1,
+          newIndex + 1,
+        ),
+      );
+      oldIndex++;
+      newIndex++;
+    } else if (table[(oldIndex + 1) * width + newIndex] >=
+        table[oldIndex * width + newIndex + 1]) {
+      result.add(
+        _DiffLine(_DiffKind.removed, oldLines[oldIndex], oldIndex + 1, null),
+      );
+      oldIndex++;
+    } else {
+      result.add(
+        _DiffLine(_DiffKind.added, newLines[newIndex], null, newIndex + 1),
+      );
+      newIndex++;
+    }
+  }
+  while (oldIndex < oldLines.length) {
+    result.add(
+      _DiffLine(_DiffKind.removed, oldLines[oldIndex], oldIndex + 1, null),
+    );
+    oldIndex++;
+  }
+  while (newIndex < newLines.length) {
+    result.add(
+      _DiffLine(_DiffKind.added, newLines[newIndex], null, newIndex + 1),
+    );
+    newIndex++;
+  }
+  return result;
+}
+
 class _SectionArtifactCard extends ConsumerWidget {
   final ChatArtifact artifact;
 
@@ -781,7 +1013,9 @@ class _SectionArtifactCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colorScheme;
-    final isDraft = artifact.type == 'sectionDraft';
+    final isExportDraft = artifact.type == 'sectionDraft';
+    final isChangeDraft = artifact.type == 'sectionChangeDraft';
+    final isDraft = isExportDraft || isChangeDraft;
     final isRevision = artifact.type == 'sectionRevision';
     final isDiscarded = artifact.status == 'discarded';
     final isSuperseded = artifact.status == 'superseded';
@@ -808,7 +1042,9 @@ class _SectionArtifactCard extends ConsumerWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              Icons.description_outlined,
+              isChangeDraft
+                  ? Icons.difference_outlined
+                  : Icons.description_outlined,
               size: 20,
               color: colors.onSecondaryContainer,
             ),
@@ -835,6 +1071,8 @@ class _SectionArtifactCard extends ConsumerWidget {
                             ? 'Superseded by a newer chat edit'
                             : artifact.status == 'index_failed'
                             ? 'Revision saved · indexing failed · retry available'
+                            : isChangeDraft
+                            ? 'Change draft · review highlighted edits before applying'
                             : 'Export review · edit in chat or save when ready')
                       : artifact.status == 'reverted'
                       ? 'Revision reverted · exported snapshot retained'
@@ -857,6 +1095,8 @@ class _SectionArtifactCard extends ConsumerWidget {
               child: Text(
                 artifact.status == 'index_failed'
                     ? 'Retry indexing'
+                    : isChangeDraft
+                    ? 'Apply changes'
                     : switch (artifact.requestedFormat) {
                         'markdown' => 'Save Markdown',
                         'json' => 'Save JSON',
@@ -964,7 +1204,9 @@ class _SectionArtifactCard extends ConsumerWidget {
     try {
       final String markdown;
       final String json;
-      if (artifact.type == 'sectionDraft') {
+      final isChangeDraft = artifact.type == 'sectionChangeDraft';
+      List<_SectionDiff> changes = const [];
+      if (artifact.type == 'sectionDraft' || isChangeDraft) {
         final revisionId = artifact.revisionId;
         if (revisionId == null) throw StateError('Draft revision is missing.');
         final storage = ref.read(localStorageProvider);
@@ -987,6 +1229,29 @@ class _SectionArtifactCard extends ConsumerWidget {
         );
         markdown = preview.markdown;
         json = preview.jsonText;
+        if (isChangeDraft) {
+          final parentId = revision.parentRevisionId;
+          final parent = parentId == null
+              ? null
+              : await storage.loadRevision(
+                  artifact.collectionId,
+                  artifact.documentId,
+                  parentId,
+                );
+          final beforeById = {
+            for (final section in parent?.sections ?? paper.sections)
+              section.id: section,
+          };
+          changes = [
+            for (final section in revision.sections)
+              if (beforeById[section.id]?.text != section.text)
+                _SectionDiff(
+                  title: section.displayName,
+                  before: beforeById[section.id]?.text ?? '',
+                  after: section.text,
+                ),
+          ];
+        }
       } else {
         final paths = await _ensureFiles(ref);
         markdown = await File(paths.markdownPath).readAsString();
@@ -996,7 +1261,7 @@ class _SectionArtifactCard extends ConsumerWidget {
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => DefaultTabController(
-          length: 2,
+          length: isChangeDraft ? 3 : 2,
           child: Dialog(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 860, maxHeight: 720),
@@ -1008,7 +1273,8 @@ class _SectionArtifactCard extends ConsumerWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            '${artifact.title} · Export review',
+                            '${artifact.title} · '
+                            '${isChangeDraft ? 'Review changes' : 'Export review'}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(dialogContext)
@@ -1024,18 +1290,22 @@ class _SectionArtifactCard extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  const TabBar(
+                  TabBar(
                     tabs: [
-                      Tab(text: 'Markdown'),
-                      Tab(text: 'JSON'),
+                      if (isChangeDraft) const Tab(text: 'Changes'),
+                      const Tab(text: 'Markdown'),
+                      const Tab(text: 'JSON'),
                     ],
                   ),
                   const Divider(height: 1),
                   Expanded(
                     child: TabBarView(
                       children: [
+                        if (isChangeDraft) _SectionDiffView(changes: changes),
                         Markdown(
-                          data: markdown,
+                          data: SectionArtifactService.readableMarkdown(
+                            markdown,
+                          ),
                           selectable: true,
                           padding: const EdgeInsets.all(20),
                           styleSheet: _ChatPageState.createMarkdownStyle(
