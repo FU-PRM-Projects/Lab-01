@@ -268,22 +268,6 @@ class _AppShellState extends ConsumerState<AppShell> {
                             : 'Switch to Dark Mode',
                         onPressed: _toggleTheme,
                       ),
-
-                      // Settings Button
-                      IconButton(
-                        icon: Icon(
-                          Icons.settings_outlined,
-                          size: 19,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        tooltip: 'Settings',
-                        onPressed: () {
-                          showDialog<void>(
-                            context: context,
-                            builder: (_) => const SettingsDialog(),
-                          );
-                        },
-                      ),
                     ],
                   ),
                 ),

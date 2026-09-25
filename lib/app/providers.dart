@@ -35,9 +35,7 @@ class DataDirectoryController {
       return;
     }
 
-    // The replacement is opened before anything is given up: disposing first
-    // would leave the provider holding released storage, and the new path
-    // persisted, if the target turns out to be unusable.
+    // Open the new storage first so a bad target leaves the old one intact.
     final newStorage = await LocalStorage.createForDirectory(newDir);
 
     final defaultDir = await LocalStorage.getDefaultDataDirectory();

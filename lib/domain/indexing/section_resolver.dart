@@ -2,13 +2,7 @@ import 'package:lab_05/data/models/document_section.dart';
 import 'package:lab_05/data/services/instruct_document_service.dart';
 import 'package:lab_05/domain/indexing/document_transcript.dart';
 
-/// Anchors the instruct model's outline into the transcript, turning a list of
-/// headings into sections that each own a concrete span of text.
-///
-/// The model reports where a heading is; this decides what it covers. A
-/// section runs from its own heading to the next one, so the sections tile the
-/// document with no gaps and no overlap, and every character belongs to
-/// exactly one of them.
+/// Anchors outline headings in the transcript; each section spans to the next heading.
 class SectionResolver {
   /// Name given to the text before the first reported heading — typically the
   /// title block, author list and affiliations.
@@ -45,9 +39,7 @@ class SectionResolver {
     final ordered = <_Anchor>[];
     for (final anchor in anchors) {
       final previous = ordered.lastOrNull;
-      // A heading that could not be located lands on a page start, which may
-      // collide with or precede one already placed. Dropping it is better than
-      // emitting an empty or out-of-order section.
+      // Drop headings that land before or on the previous one.
       if (previous != null && anchor.offset <= previous.offset) continue;
       ordered.add(anchor);
     }

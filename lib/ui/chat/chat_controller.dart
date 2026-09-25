@@ -414,9 +414,7 @@ class ChatController extends StateNotifier<ChatState> {
     );
     if (revision == null) throw StateError('Draft revision was deleted.');
 
-    // An untouched export review contains the active content verbatim. Saving
-    // it only materializes the selected files; it does not need embeddings or
-    // an OpenRouter request.
+    // An untouched export review only writes files; no embeddings or API call needed.
     if (revision.createdBy == 'export_review') {
       state = const ChatState(
         isStreaming: true,

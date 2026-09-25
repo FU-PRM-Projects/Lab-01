@@ -1,9 +1,4 @@
-/// One tool invocation made by the research agent during a single turn.
-///
-/// Records are emitted twice: once when the call starts (so the UI can show it
-/// running) and once when it settles, carrying the same [id] both times. They
-/// are saved alongside the assistant message so reopening a chat still shows
-/// what the agent did to produce the answer.
+/// One tool call made by the research agent, emitted on start and on settle.
 class ToolCallRecord {
   static const statusRunning = 'running';
   static const statusOk = 'ok';

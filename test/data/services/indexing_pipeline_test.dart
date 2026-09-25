@@ -18,11 +18,7 @@ const _settings = AppSettings(
   chatModel: 'test/model',
 );
 
-/// A stripper that reports the native extractor is unavailable.
-///
-/// The tests below drive the per-page transcription fallback, so both of the
-/// fast-path stages are made to fail: without this the pipeline would try to
-/// load the real native library.
+/// Stripper that reports the native extractor as unavailable (forces the fallback path).
 Future<native.StrippedPdf> unavailableStripper({
   required String pdfPath,
   required int minWidth,
@@ -186,9 +182,7 @@ PageTranscriptionService fakeTranscriber(
   );
 }
 
-/// The instruct model is now called twice with different system prompts: once
-/// for the outline, then once per bibliography window. The fake answers each
-/// by looking at which prompt it was sent.
+/// Fake instruct model answering the outline and bibliography prompts separately.
 InstructDocumentService fakeInstruct({
   required Object outlineReply,
   Object referencesReply = const {'references': <Object>[]},
@@ -352,10 +346,7 @@ void main() {
         onIndexingModel: indexingModels.add,
       ).run(pdfPath: 'paper.pdf', documentId: 'doc_1');
 
-      // The page images only ever reach the vision model, and the chat model
-      // is not involved in indexing at all. The outline and the bibliography
-      // are separate jobs on separate models: a reference window is short and
-      // formulaic, so it goes to the small fast one.
+      // Pages go to the vision model; outline and bibliography use separate models.
       expect(transcriptionModels, {'qwen/qwen3-vl-235b-a22b-instruct'});
       expect(indexingModels, {
         'qwen/qwen3-235b-a22b-2507',

@@ -57,23 +57,10 @@ class OcrResult {
   bool get isEmpty => pages.every((page) => page.trim().isEmpty);
 }
 
-/// Parses a whole PDF in one OpenRouter request using the `file-parser`
-/// plugin.
+/// Parses a whole PDF to per-page Markdown in one OpenRouter `file-parser` request.
 ///
-/// This replaces rendering and transcribing every page separately: the PDF
-/// goes up once as base64 and comes back as per-page Markdown. For an N-page
-/// paper that is one request instead of N, which is where nearly all of the
-/// import time was going.
-///
-/// The PDF handed in has already had its figures lifted out natively, so what
-/// goes over the wire is text-only and a fraction of the original size. Any
-/// image the native pass could not decode is still in there, and mistral-ocr
-/// returns up to [maxExtractedImages] of those — [OcrResult.figures] carries
-/// them so those figures are not lost.
-///
-/// The parsed document arrives in `message.annotations`, not in the assistant
-/// message — the model itself is only along for the ride, so it is asked for a
-/// single token and its reply is discarded.
+/// The result arrives in `message.annotations`; the model reply is discarded.
+/// Images the native pass missed come back in [OcrResult.figures].
 class PdfOcrService {
   PdfOcrService({
     required this.settings,
@@ -97,10 +84,7 @@ class PdfOcrService {
   final http.Client _client;
   final _abort = Completer<void>();
 
-  /// Mistral OCR extracts at most this many images per document; text is
-  /// always returned in full. Figures are pulled out natively before upload
-  /// precisely so this ceiling never applies to them — it only bounds the
-  /// leftovers the native pass could not decode.
+  /// Max images Mistral OCR extracts per document (text is always complete).
   static const maxExtractedImages = 8;
 
   String get endpoint => settings.chatCompletionsUrl;
@@ -183,13 +167,8 @@ class PdfOcrService {
     return result;
   }
 
-  /// Pulls the parsed document out of a chat completion response.
-  ///
-  /// The annotation's `content` is a flat list: a `<file name="...">` opener,
-  /// one text part per page in document order, the extracted images, and a
-  /// `</file>` closer. Images arrive after the text rather than beside the
-  /// page they came from, so each one is placed by looking for its
-  /// `![img-N.jpeg](img-N.jpeg)` placeholder in the page Markdown.
+  /// Extracts pages and images from the `file-parser` annotation, placing each
+  /// image on the page that contains its `![img-N.jpeg](img-N.jpeg)` placeholder.
   @visibleForTesting
   static OcrResult parseAnnotations(Map<String, dynamic> json) {
     final choices = json['choices'] as List<dynamic>?;
@@ -263,10 +242,6 @@ class PdfOcrService {
   static final _envelope = RegExp(r'^</?file\b[^>]*>$');
 
   /// Finds the page whose Markdown references the [index]-th extracted image.
-  ///
-  /// The parser names them `img-0`, `img-1`, ... in the order they are
-  /// returned, so the index doubles as the placeholder number. The extension
-  /// is matched loosely in case the parser emits png for some images.
   static ({String label, int page}) _figureName(List<String> pages, int index) {
     final pattern = RegExp(
       r'!\[[^\]]*\]\(\s*(img-' + index.toString() + r'\.\w+)\s*\)',

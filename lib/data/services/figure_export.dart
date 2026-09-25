@@ -105,9 +105,7 @@ class FigureExporter {
     return short.isEmpty ? 'paper' : short;
   }
 
-  /// Copies every figure of [paper] into a new folder under [target], named
-  /// after the paper, next to a `figures.json` that records each image's
-  /// page, section and caption so the export can be reused without the app.
+  /// Copies all figures of [paper] into a new folder under [target] with a `figures.json` index.
   Future<FigureExportResult> exportAll({
     required String collectionId,
     required PaperDocument paper,

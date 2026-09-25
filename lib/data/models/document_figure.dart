@@ -1,11 +1,6 @@
 import 'dart:typed_data';
 
-/// One figure lifted out of a PDF, before it has been written to disk.
-///
-/// The indexing pipeline produces these; the repository saves the bytes
-/// alongside the document and turns each one into a [PaperChunk] carrying the
-/// saved path, so figures ride through vector-id assignment, storage and
-/// retrieval on exactly the same rails as text passages.
+/// A figure extracted from a PDF, before its bytes are saved to disk.
 class IndexedFigure {
   /// 1-based page the figure is printed on.
   final int page;
@@ -47,9 +42,7 @@ class IndexedFigure {
     _ => 'jpg',
   };
 
-  /// The text embedded alongside the image. A figure with no caption still
-  /// carries its page and section, so it lands somewhere sensible in the
-  /// vector space rather than embedding as a bare picture.
+  /// Text embedded for the figure: caption plus page and section.
   String get embeddingText {
     final parts = [
       if (section.trim().isNotEmpty) section.trim(),

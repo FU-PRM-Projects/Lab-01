@@ -62,28 +62,10 @@ class IndexedDocument {
 
 /// Turns a PDF into sections, chunks, figures and references.
 ///
-/// Reading the document happens in two passes that each do what they are best
-/// at. A native pass lifts every raster figure out of the PDF and hands back a
-/// copy with those images blanked, so the upload is text-only and a fraction
-/// of the original size. That copy then goes to OpenRouter's `file-parser`
-/// plugin in a *single* request, which returns the whole paper as per-page
-/// Markdown.
-///
-/// This replaced a render-and-transcribe loop that cost one multimodal request
-/// per page. It also sidesteps the parser's 8-image-per-document ceiling:
-/// figures never go through the parser at all, so a paper can carry as many as
-/// it likes.
-///
-/// An instruct model then reads the assembled transcript and reports the
-/// outline and the bibliography; it is never asked for body text, so sections
-/// and chunks stay verbatim. Chunking is deterministic Dart over the resolved
-/// sections.
-///
-/// If the OCR pass fails or comes back empty, the old per-page transcription
-/// path runs instead — slower and dearer, but it reads papers the parser
-/// chokes on. Any other failure aborts the import: a partially read paper
-/// would index as a quietly incomplete document, which is worse than a failed
-/// import the user can retry.
+/// Figures are extracted natively and blanked out, the text-only PDF is parsed
+/// to per-page Markdown in one `file-parser` request, then an instruct model
+/// reports the outline and bibliography. Falls back to per-page transcription
+/// if OCR fails; any other failure aborts the import.
 class IndexingPipeline {
   IndexingPipeline({
     required this.settings,
@@ -108,17 +90,10 @@ class IndexingPipeline {
 
   final AppSettings settings;
 
-  /// How many pages are transcribed at once.
-  ///
-  /// Each page is a separate request whose cost is the tokens it generates, so
-  /// the only way to shorten the transcription phase is to overlap more of
-  /// them. The ceiling is the provider's rate limit rather than anything here:
-  /// if OpenRouter starts returning 429s on long papers, lower this.
+  /// How many pages are transcribed concurrently (lower if rate-limited).
   final int maxConcurrentPages;
 
-  /// Smallest figure worth extracting, in pixels. Papers are full of rule
-  /// lines, logos and inline math bitmaps; embedding those costs tokens and
-  /// returns nothing, so anything smaller is left in the PDF.
+  /// Smallest figure worth extracting, in pixels.
   final int minFigureWidth;
   final int minFigureHeight;
 
@@ -214,9 +189,7 @@ class IndexingPipeline {
         );
       }
 
-      // The bibliography is read from the references section alone, a window
-      // at a time. Asking for it alongside the outline overruns the model's
-      // output budget on any paper with a long reference list.
+      // Read the bibliography separately, a window at a time, to stay within output limits.
       final bibliography = _bibliographyText(transcript, sections);
       final references = bibliography == null
           ? const <PaperReference>[]
@@ -345,12 +318,7 @@ class IndexingPipeline {
       ),
   ];
 
-  /// Pairs each extracted image with the caption and section of its page.
-  ///
-  /// Captions are matched in page order: the first figure on a page takes the
-  /// first caption printed there, the second takes the next, and so on. That
-  /// is right far more often than not, and a figure whose caption cannot be
-  /// found still indexes under its section and page.
+  /// Pairs each extracted image with its page's captions (in order) and section.
   static List<IndexedFigure> _describeFigures({
     required List<_RawFigure> raw,
     required DocumentTranscript transcript,
@@ -503,9 +471,7 @@ class IndexingPipeline {
     ]);
   }
 
-  /// The text the bibliography is parsed out of: the resolved references
-  /// section, or — if the outline missed its heading — everything from the
-  /// last "References" heading in the transcript to the end.
+  /// The references section, or everything after the last "References" heading.
   static String? _bibliographyText(
     DocumentTranscript transcript,
     List<DocumentSection> sections,

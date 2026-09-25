@@ -8,11 +8,7 @@ import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/data/services/figure_export.dart';
 import 'package:lab_05/ui/core/snackbar.dart';
 
-/// Saves one figure wherever the person picks in the native Save As dialog.
-///
-/// The file name is worked out before the first `await`, so it always names
-/// the figure that was asked for, whatever the screen shows by the time the
-/// dialog closes.
+/// Saves one figure via the native Save As dialog.
 Future<void> saveFigureAs(
   BuildContext context, {
   required PaperFigure figure,

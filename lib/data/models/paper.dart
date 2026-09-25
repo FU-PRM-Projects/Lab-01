@@ -63,9 +63,7 @@ class PaperChunk {
   /// image rather than as text alone.
   bool get isFigure => imagePath != null;
 
-  /// What is actually embedded. The section name is prepended so a passage
-  /// carries the part of the paper it argues from — two otherwise similar
-  /// paragraphs in Methodology and Related Work then embed apart.
+  /// Embedded text, prefixed with the section name.
   String get embeddingText =>
       section.trim().isEmpty ? text : '$section\n\n$text';
 
@@ -304,12 +302,7 @@ class PaperDocument {
   }
 }
 
-/// A folder holds exactly one paper, and this says whether [PaperDocument]
-/// fills that slot.
-///
-/// Only a paper that indexed (or indexed under an older pipeline and now
-/// awaits a re-import) takes the slot. A failed or abandoned import is
-/// leftover state, and the next import replaces it.
+/// Whether this paper occupies its folder's single paper slot.
 extension PaperFolderSlot on PaperDocument {
   bool get occupiesFolder =>
       status == DocumentStatus.ready || status == DocumentStatus.needsReindex;

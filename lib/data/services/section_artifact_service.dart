@@ -5,11 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:lab_05/data/models/document_section.dart';
 import 'package:lab_05/data/models/paper.dart';
 
-/// A reproducible pair of section artifacts derived from one indexed paper.
-///
-/// JSON is the machine-readable source for reuse. Markdown keeps the exact
-/// transcribed section text and adds only comments/front matter around it, so
-/// exporting never asks a model to rewrite the paper.
+/// Section artifacts (JSON + Markdown) derived from one indexed paper, text kept verbatim.
 class SectionArtifactBundle {
   final String markdown;
   final Map<String, dynamic> json;
@@ -22,9 +18,7 @@ class SectionArtifactBundle {
 class SectionArtifactService {
   static const schemaVersion = 1;
 
-  /// Removes YAML front matter for the human-readable in-app preview.
-  /// The saved Markdown keeps it for provenance and reproducibility; the JSON
-  /// tab exposes the same metadata in a format intended for inspection.
+  /// Removes YAML front matter for the in-app preview.
   static String readableMarkdown(String markdown) {
     final lines = markdown.split('\n');
     if (lines.isEmpty || lines.first.trim() != '---') return markdown;

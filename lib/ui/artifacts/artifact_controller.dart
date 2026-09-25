@@ -12,9 +12,6 @@ import 'package:lab_05/data/models/document_section.dart';
 import 'package:lab_05/data/models/reference.dart';
 
 /// Whether the artifact panel is open, for one chat.
-///
-/// A folder holds one paper, so the panel has nothing to select: it only
-/// opens and closes.
 class ArtifactPanelView {
   final bool isOpen;
 
@@ -238,9 +235,7 @@ class ResolvedReferencesNotifier
     }
     if (pending.isEmpty) return;
 
-    // This provider is keyed by document alone, so the collection is captured
-    // before the first await: switching collections mid-resolution would
-    // otherwise file this paper's matches under the collection now selected.
+    // Capture the collection before awaiting, in case the selection changes.
     final collectionId = _collectionId;
     if (collectionId == null) return;
 

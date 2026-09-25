@@ -1,9 +1,4 @@
-/// A single bibliography entry extracted from a paper's reference section by
-/// the instruct model during indexing.
-///
-/// Entries keep both the verbatim [raw] text and the model's structured
-/// breakdown so a later validating agent can check one against the other and
-/// against external metadata.
+/// A bibliography entry: verbatim [raw] text plus its structured fields.
 class PaperReference {
   /// 1-based position within the bibliography.
   final int index;

@@ -342,9 +342,7 @@ $initialEvidence
             'The model requested tools after the turn budget was exhausted',
           );
         }
-        // Keep native provider blocks when available. Some models emit tool
-        // calls as DSML text, so convert those to canonical tool-call blocks
-        // before appending tool results to the conversation.
+        // Keep native tool-call blocks; convert DSML text tool calls to canonical ones.
         conversation.add(
           dsmlCalls.isEmpty && jsonDraftCalls.isEmpty
               ? message
@@ -763,10 +761,8 @@ $initialEvidence
     return trimmed.startsWith('<') && trimmed.length < 64;
   }
 
-  /// Some OpenRouter models print the intended section-edit arguments as a
-  /// JSON code block instead of emitting a native tool call. A revision id is
-  /// required here so an ordinary JSON answer containing `sectionName` and
-  /// `content` cannot accidentally mutate the paper.
+  /// Parses section-edit tool calls some models print as a JSON code block.
+  /// Requires a revision id so ordinary JSON answers can't modify the paper.
   static List<AIChatMessageToolCall> _parseJsonDraftToolCalls(String text) {
     final match = RegExp(r'\{[\s\S]*\}').firstMatch(text);
     if (match == null) return const [];
@@ -810,9 +806,7 @@ $initialEvidence
       .replaceFirst(RegExp(r'```json\s*\{[\s\S]*?\}\s*```'), '')
       .replaceFirst(RegExp(r'\{[\s\S]*\}'), '');
 
-  /// Converts the textual DSML tool syntax emitted by a few OpenRouter models
-  /// into the same canonical calls returned by providers with native tool
-  /// calling. DSML is model control data and must never be rendered to users.
+  /// Converts textual DSML tool calls into canonical tool calls (never shown to users).
   static List<AIChatMessageToolCall> _parseDsmlToolCalls(String text) {
     if (!text.toUpperCase().contains('DSML') ||
         !text.toLowerCase().contains('invoke')) {
@@ -1002,19 +996,8 @@ $initialEvidence
     );
   }
 
-  /// Loads the cited figures and returns them as one multimodal message.
-  ///
-  /// The images go in their own turn rather than into the system prompt, since
-  /// image parts belong on a human message; each is labelled with its source
-  /// ID so the model can cite a figure the same way it cites a passage.
-  ///
-  /// A figure whose file cannot be read is skipped: its caption is already in
-  /// the evidence block, so the answer degrades rather than failing.
-  ///
-  /// Called again after every round of tool results, since a later
-  /// `search_papers` or `read_page` can cite a figure the opening retrieval
-  /// never saw. [sent] carries the source IDs already attached and grows here,
-  /// so no image is paid for twice and the budget spans the whole turn.
+  /// Loads cited figures as one multimodal message, labelled by source ID.
+  /// Unreadable figures are skipped; [sent] tracks figures already attached this turn.
   Future<List<ChatMessage>> _figureMessages(
     String collectionId,
     _Evidence evidence,
@@ -1063,9 +1046,7 @@ $initialEvidence
     return [ChatMessage.human(ChatMessageContent.multiModal(parts))];
   }
 
-  /// How many figures are sent as images in one turn. Each costs several
-  /// hundred tokens, and a request carrying every figure a broad query matched
-  /// would crowd out the text evidence.
+  /// Max figures sent as images per turn.
   static const _maxAttachedFigures = 6;
 
   Iterable<ChatMessage> _history(List<Map<String, String>> messages) sync* {

@@ -9,11 +9,7 @@ import 'package:http/retry.dart';
 
 import 'package:lab_05/data/models/app_settings.dart';
 
-/// One thing to embed: a passage, or a figure with the text that describes it.
-///
-/// A figure embeds as a single joint vector over its image *and* its caption,
-/// so it lands in the same space as the text chunks and needs no second index
-/// or separate query path.
+/// One embedding input: a passage, or a figure plus its caption (joint vector).
 class EmbeddingInput {
   final String text;
 
@@ -88,12 +84,8 @@ class EmbeddingClient {
     for (final text in texts) EmbeddingInput.text(text),
   ], batchSize: batchSize);
 
-  /// Embeds a mix of passages and figures, returning one vector per input in
-  /// the order they were given.
-  ///
-  /// Batches carrying an image are sent in smaller groups: a figure is worth
-  /// a few hundred tokens against a passage's few dozen, and a full batch of
-  /// them makes for a large request and a slow one.
+  /// Embeds passages and figures, one vector per input in order.
+  /// Image batches are sent in smaller groups.
   Future<List<List<double>>> embedInputs(
     List<EmbeddingInput> inputs, {
     int batchSize = 16,
@@ -130,9 +122,7 @@ class EmbeddingClient {
             })
             ..body = jsonEncode({
               'model': model,
-              // Plain strings for text-only batches, keeping the wire format
-              // identical to what text documents have always sent; the content
-              // array form is only needed once an image is involved.
+              // Plain strings for text-only batches; content arrays only when images are present.
               'input': isImageBatch
                   ? [for (final input in batch) input.toContent()]
                   : [for (final input in batch) input.text],

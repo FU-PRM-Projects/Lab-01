@@ -3,24 +3,10 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:markdown/markdown.dart' as md;
 
-// Papers are transcribed with formulas kept as LaTeX (see
-// PageTranscriptionService), and the chat model follows the same
-// convention when it quotes or restates them. flutter_markdown_plus only
-// understands plain Markdown, so without this, a formula like
-// `$H_z^o \in \mathbb{R}^{N_z \times D_1}$` shows up as raw text instead
-// of a rendered equation.
-//
-// Display math (`$$...$$`) is a BlockSyntax, not an InlineSyntax: it needs
-// to occupy its own line rather than being embedded as a WidgetSpan inside
-// a run of text, and MarkdownBody only lays a custom element out as a
-// block when both (a) the syntax that produced it is registered via
-// `blockSyntaxes` and (b) its builder's `isBlockElement()` returns true.
-// Inline math (`$...$`) stays an InlineSyntax and is registered via
-// `inlineSyntaxes` as usual.
+// LaTeX support for flutter_markdown_plus: `$$...$$` as a block syntax,
+// `$...$` as an inline syntax.
 
-/// Matches a display ("block") math span opened by a line starting with
-/// `$$`, closed either on that same line (`$$formula$$`) or on a later
-/// line ending in `$$`.
+/// Matches display math starting with `$$`, closed on the same or a later line.
 class MathDisplaySyntax extends md.BlockSyntax {
   const MathDisplaySyntax();
 
@@ -61,10 +47,7 @@ class MathDisplaySyntax extends md.BlockSyntax {
   }
 }
 
-/// Matches inline math delimited by a single pair of `$...$`.
-///
-/// The lookaround assertions keep it from firing inside a `$$...$$` span
-/// and from treating a lone price-style `$5` as the start of math.
+/// Matches inline `$...$` math (not `$$` or prices like `$5`).
 class MathInlineSyntax extends md.InlineSyntax {
   MathInlineSyntax() : super(r'(?<!\$)\$(?!\$)([^\n$]+?)\$(?!\$)');
 
@@ -95,9 +78,7 @@ class MathInlineBuilder extends MarkdownElementBuilder {
   }
 }
 
-/// Renders a `math_display` node produced by [MathDisplaySyntax] as TeX, on
-/// its own line and horizontally scrollable so a long formula never
-/// overflows the chat bubble.
+/// Renders display math on its own, horizontally scrollable line.
 class MathDisplayBuilder extends MarkdownElementBuilder {
   @override
   bool isBlockElement() => true;
@@ -134,10 +115,6 @@ final Map<String, MarkdownElementBuilder> _mathBuilders = {
 };
 
 /// A [MarkdownBody] that also renders `$...$` and `$$...$$` as TeX.
-///
-/// Every Markdown view in the app goes through this, so the math syntaxes
-/// are registered in one place. A view that needs its own syntax (the source
-/// panel's underline) passes it in [extraInlineSyntaxes] and [extraBuilders].
 class MathMarkdown extends StatelessWidget {
   const MathMarkdown({
     super.key,
