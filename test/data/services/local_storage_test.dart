@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lab_05/data/models/collection.dart';
+import 'package:lab_05/data/models/document_section.dart';
 import 'package:lab_05/data/models/paper.dart';
 import 'package:lab_05/data/services/local_storage.dart';
 
@@ -90,6 +91,93 @@ void main() {
       final emptyPapers = await storage.listPapers(col.id);
       expect(emptyPapers.isEmpty, isTrue);
     });
+
+    test(
+      'Section artifacts are saved together and removed with paper',
+      () async {
+        final paper = PaperDocument(
+          id: 'doc_sections',
+          fileName: 'sections.pdf',
+          title: 'Section Export',
+          sha256: 'paper-hash',
+          pageCount: 2,
+          status: DocumentStatus.ready,
+          createdAt: DateTime.utc(2026),
+          embeddingProfileId: 'profile',
+          sections: const [
+            DocumentSection(
+              id: 'doc_sections:s0',
+              ordinal: 0,
+              name: 'Introduction',
+              kind: SectionKind.body,
+              startPage: 1,
+              endPage: 2,
+              startChar: 0,
+              endChar: 30,
+              text: '# Introduction\n\nBody.',
+            ),
+          ],
+        );
+
+        final paths = await storage.saveSectionArtifacts('collection', paper);
+        expect(
+          await File(paths.markdownPath).readAsString(),
+          contains('Body.'),
+        );
+        final json = await storage.readJsonSafely(paths.jsonPath);
+        expect(json?['documentId'], paper.id);
+        expect(json?['revisionId'], 'rev_original');
+        expect((json?['sections'] as List<dynamic>), hasLength(1));
+
+        final draft = await storage.createPendingRevision(
+          collectionId: 'collection',
+          paper: paper,
+          sectionId: 'doc_sections:s0',
+          revisedContent: '# Introduction\n\nEdited body.',
+          instruction: 'Clarify the introduction',
+        );
+        expect(draft.isPending, isTrue);
+        expect(draft.parentRevisionId, 'rev_original');
+        final refined = await storage.createPendingRevision(
+          collectionId: 'collection',
+          paper: paper,
+          sectionId: 'doc_sections:s0',
+          revisedContent: '# Introduction\n\nEdited twice.',
+          instruction: 'Refine the pending draft',
+          baseRevisionId: draft.id,
+        );
+        expect(refined.parentRevisionId, draft.id);
+        expect(refined.sections.single.text, contains('Edited twice'));
+        expect(
+          (await storage.loadActiveRevision('collection', paper))!.id,
+          'rev_original',
+        );
+        await expectLater(
+          storage.activateRevision('collection', paper.id, draft.id),
+          throwsStateError,
+        );
+
+        final saved = draft.copyWith(status: 'saved', indexStatus: 'indexed');
+        await storage.saveRevision('collection', saved);
+        await storage.activateRevision('collection', paper.id, saved.id);
+        expect(
+          (await storage.loadActiveRevision('collection', paper))!.id,
+          saved.id,
+        );
+
+        await storage.deletePaper('collection', paper.id);
+        expect(
+          await Directory(storage.artifactsDir('collection', paper.id))
+              .exists(),
+          isFalse,
+        );
+        expect(
+          await Directory(storage.revisionsDir('collection', paper.id))
+              .exists(),
+          isFalse,
+        );
+      },
+    );
 
     test(
       'Settings save and load with openRouterBaseUrl and openRouterApiKey',

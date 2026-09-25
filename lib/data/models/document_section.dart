@@ -62,6 +62,7 @@ class DocumentSection {
       rawHeading?.trim().isNotEmpty == true ? rawHeading!.trim() : name;
 
   DocumentSection copyWith({
+    int? startChar,
     int? endChar,
     int? endPage,
     String? text,
@@ -77,7 +78,7 @@ class DocumentSection {
       kind: kind,
       startPage: startPage,
       endPage: endPage ?? this.endPage,
-      startChar: startChar,
+      startChar: startChar ?? this.startChar,
       endChar: endChar ?? this.endChar,
       text: text ?? this.text,
     );

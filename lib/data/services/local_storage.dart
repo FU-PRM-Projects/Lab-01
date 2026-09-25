@@ -4,13 +4,17 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:lab_05/data/models/app_settings.dart';
 import 'package:lab_05/data/models/index_state.dart';
 
 import 'package:lab_05/data/models/chat.dart';
 import 'package:lab_05/data/models/collection.dart';
+import 'package:lab_05/data/models/document_section.dart';
 import 'package:lab_05/data/models/paper.dart';
+import 'package:lab_05/data/models/section_revision.dart';
+import 'package:lab_05/data/services/section_artifact_service.dart';
 
 class LocalStorage {
   final Directory rootDir;
@@ -136,6 +140,22 @@ class LocalStorage {
       p.join(collectionDir(collectionId), 'chats');
   String referencesDir(String collectionId) =>
       p.join(collectionDir(collectionId), 'references');
+  String artifactsDir(String collectionId, String documentId) =>
+      p.join(collectionDir(collectionId), 'artifacts', documentId);
+  String artifactDir(
+    String collectionId,
+    String documentId,
+    String artifactId,
+  ) => p.join(artifactsDir(collectionId, documentId), artifactId);
+  String revisionsDir(String collectionId, String documentId) =>
+      p.join(collectionDir(collectionId), 'revisions', documentId);
+  String revisionManifestPath(String collectionId, String documentId) =>
+      p.join(revisionsDir(collectionId, documentId), 'manifest.json');
+  String revisionPath(
+    String collectionId,
+    String documentId,
+    String revisionId,
+  ) => p.join(revisionsDir(collectionId, documentId), '$revisionId.json');
 
   String paperPdfPath(String collectionId, String documentId) =>
       p.join(documentsDir(collectionId), '$documentId.pdf');
@@ -143,6 +163,26 @@ class LocalStorage {
       p.join(metadataDir(collectionId), '$documentId.json');
   String referencesPath(String collectionId, String documentId) =>
       p.join(referencesDir(collectionId), '$documentId.json');
+  String sectionsMarkdownPath(
+    String collectionId,
+    String documentId, [
+    String? artifactId,
+  ]) => p.join(
+    artifactId == null
+        ? artifactsDir(collectionId, documentId)
+        : artifactDir(collectionId, documentId, artifactId),
+    'sections.md',
+  );
+  String sectionsJsonPath(
+    String collectionId,
+    String documentId, [
+    String? artifactId,
+  ]) => p.join(
+    artifactId == null
+        ? artifactsDir(collectionId, documentId)
+        : artifactDir(collectionId, documentId, artifactId),
+    'sections.json',
+  );
 
   /// Directory holding one document's extracted figures.
   String figuresDir(String collectionId, String documentId) =>
@@ -172,6 +212,24 @@ class LocalStorage {
     final tempFile = File(tempPath);
     final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
     await tempFile.writeAsString(jsonStr, flush: true);
+
+    try {
+      await tempFile.rename(filePath);
+    } finally {
+      if (await tempFile.exists()) await tempFile.delete();
+    }
+  }
+
+  /// Writes text through a temporary sibling so an interrupted export cannot
+  /// leave a truncated artifact at the final path.
+  Future<void> writeStringSafely(String filePath, String content) async {
+    final parent = Directory(p.dirname(filePath));
+    if (!parent.existsSync()) {
+      parent.createSync(recursive: true);
+    }
+    final tempPath = '$filePath.tmp_${DateTime.now().microsecondsSinceEpoch}';
+    final tempFile = File(tempPath);
+    await tempFile.writeAsString(content, flush: true);
 
     try {
       await tempFile.rename(filePath);
@@ -308,6 +366,272 @@ class LocalStorage {
     );
   }
 
+  Future<SectionRevision> ensureOriginalRevision(
+    String collectionId,
+    PaperDocument paper,
+  ) async {
+    final manifestJson = await readJsonSafely(
+      revisionManifestPath(collectionId, paper.id),
+    );
+    if (manifestJson != null) {
+      final manifest = RevisionManifest.fromJson(manifestJson);
+      final existing = await loadRevision(
+        collectionId,
+        paper.id,
+        manifest.originalRevisionId,
+      );
+      if (existing != null) return existing;
+    }
+
+    final now = DateTime.now().toUtc();
+    final original = SectionRevision(
+      id: 'rev_original',
+      documentId: paper.id,
+      status: 'saved',
+      indexStatus: 'indexed',
+      createdBy: 'original_extraction',
+      createdAt: paper.createdAt,
+      updatedAt: now,
+      sections: paper.sections,
+      chunks: paper.chunks.where((chunk) => !chunk.isFigure).toList(),
+    );
+    await saveRevision(collectionId, original);
+    await writeJsonSafely(
+      revisionManifestPath(collectionId, paper.id),
+      RevisionManifest(
+        documentId: paper.id,
+        originalRevisionId: original.id,
+        currentRevisionId: original.id,
+      ).toJson(),
+    );
+    return original;
+  }
+
+  Future<void> saveRevision(String collectionId, SectionRevision revision) =>
+      writeJsonSafely(
+        revisionPath(collectionId, revision.documentId, revision.id),
+        revision.toJson(),
+      );
+
+  Future<SectionRevision?> loadRevision(
+    String collectionId,
+    String documentId,
+    String revisionId,
+  ) async {
+    final json = await readJsonSafely(
+      revisionPath(collectionId, documentId, revisionId),
+    );
+    return json == null ? null : SectionRevision.fromJson(json);
+  }
+
+  Future<List<SectionRevision>> listRevisions(
+    String collectionId,
+    String documentId,
+  ) async {
+    final dir = Directory(revisionsDir(collectionId, documentId));
+    if (!await dir.exists()) return const [];
+    final revisions = <SectionRevision>[];
+    for (final entity in dir.listSync()) {
+      if (entity is! File ||
+          !entity.path.endsWith('.json') ||
+          p.basename(entity.path) == 'manifest.json') {
+        continue;
+      }
+      final json = await readJsonSafely(entity.path);
+      if (json != null) revisions.add(SectionRevision.fromJson(json));
+    }
+    revisions.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return revisions;
+  }
+
+  Future<RevisionManifest?> loadRevisionManifest(
+    String collectionId,
+    String documentId,
+  ) async {
+    final json = await readJsonSafely(
+      revisionManifestPath(collectionId, documentId),
+    );
+    return json == null ? null : RevisionManifest.fromJson(json);
+  }
+
+  Future<SectionRevision?> loadActiveRevision(
+    String collectionId,
+    PaperDocument paper,
+  ) async {
+    final original = await ensureOriginalRevision(collectionId, paper);
+    final manifest = await loadRevisionManifest(collectionId, paper.id);
+    if (manifest == null || manifest.currentRevisionId == original.id) {
+      return original;
+    }
+    return loadRevision(collectionId, paper.id, manifest.currentRevisionId);
+  }
+
+  Future<void> activateRevision(
+    String collectionId,
+    String documentId,
+    String revisionId,
+  ) async {
+    final revision = await loadRevision(collectionId, documentId, revisionId);
+    if (revision == null || !revision.isIndexed || revision.status != 'saved') {
+      throw StateError('Only a saved, indexed revision can become active.');
+    }
+    final manifest = await loadRevisionManifest(collectionId, documentId);
+    if (manifest == null) throw StateError('Revision manifest is missing.');
+    await writeJsonSafely(
+      revisionManifestPath(collectionId, documentId),
+      RevisionManifest(
+        documentId: documentId,
+        originalRevisionId: manifest.originalRevisionId,
+        currentRevisionId: revisionId,
+      ).toJson(),
+    );
+  }
+
+  Future<void> deletePendingRevision(
+    String collectionId,
+    String documentId,
+    String revisionId,
+  ) async {
+    final revision = await loadRevision(collectionId, documentId, revisionId);
+    if (revision == null) return;
+    final manifest = await loadRevisionManifest(collectionId, documentId);
+    if (revision.isIndexed || manifest?.currentRevisionId == revisionId) {
+      throw StateError('An active or indexed revision cannot be discarded.');
+    }
+    final file = File(revisionPath(collectionId, documentId, revisionId));
+    if (await file.exists()) await file.delete();
+  }
+
+  Future<SectionRevision> createPendingRevision({
+    required String collectionId,
+    required PaperDocument paper,
+    required String sectionId,
+    required String revisedContent,
+    required String instruction,
+    String? baseRevisionId,
+  }) async {
+    final base = baseRevisionId == null
+        ? await loadActiveRevision(collectionId, paper)
+        : await loadRevision(collectionId, paper.id, baseRevisionId);
+    if (base == null || base.documentId != paper.id) {
+      throw StateError('No valid base revision is available.');
+    }
+    if (!base.sections.any((section) => section.id == sectionId)) {
+      throw StateError('Section not found: $sectionId');
+    }
+    final now = DateTime.now().toUtc();
+    final edited = [
+      for (final section in base.sections)
+        section.id == sectionId
+            ? section.copyWith(text: revisedContent.trim())
+            : section,
+    ];
+    var offset = 0;
+    final normalized = <DocumentSection>[];
+    for (final section in edited) {
+      normalized.add(
+        section.copyWith(
+          startChar: offset,
+          endChar: offset + section.text.length,
+        ),
+      );
+      offset += section.text.length + 2;
+    }
+    final revision = SectionRevision(
+      id: 'rev_${const Uuid().v4()}',
+      documentId: paper.id,
+      parentRevisionId: base.id,
+      status: 'pending',
+      indexStatus: 'pending',
+      createdBy: 'ai_edit',
+      instruction: instruction,
+      createdAt: now,
+      updatedAt: now,
+      sections: normalized,
+    );
+    await saveRevision(collectionId, revision);
+    return revision;
+  }
+
+  /// Starts an export review without writing Markdown or JSON files.
+  ///
+  /// The review is a pending revision cloned from the currently active
+  /// revision. Chat edits can branch from it, and files are only materialized
+  /// after the user explicitly saves the reviewed revision.
+  Future<SectionRevision> createExportReview({
+    required String collectionId,
+    required PaperDocument paper,
+  }) async {
+    final base = await loadActiveRevision(collectionId, paper);
+    if (base == null || base.sections.isEmpty) {
+      throw StateError('This paper has no extracted sections to review.');
+    }
+    final now = DateTime.now().toUtc();
+    final revision = SectionRevision(
+      id: 'rev_${const Uuid().v4()}',
+      documentId: paper.id,
+      parentRevisionId: base.id,
+      status: 'pending',
+      indexStatus: 'pending',
+      createdBy: 'export_review',
+      instruction: 'Review before export',
+      createdAt: now,
+      updatedAt: now,
+      sections: base.sections,
+    );
+    await saveRevision(collectionId, revision);
+    return revision;
+  }
+
+  /// Creates a versioned portable artifact. The source revision is recorded
+  /// beside the files so an export can always be traced and reproduced.
+  Future<
+    ({
+      String markdownPath,
+      String jsonPath,
+      String artifactId,
+      String revisionId,
+    })
+  >
+  saveSectionArtifacts(
+    String collectionId,
+    PaperDocument paper, {
+    SectionRevision? revision,
+    String? artifactId,
+  }) async {
+    final source = revision ?? await loadActiveRevision(collectionId, paper);
+    if (source == null || source.sections.isEmpty) {
+      throw StateError('This paper has no extracted sections to export.');
+    }
+    final id = artifactId ?? 'artifact_${const Uuid().v4()}';
+    final exportedPaper = paper.copyWith(sections: source.sections);
+    final bundle = SectionArtifactService.build(
+      exportedPaper,
+      revisionId: source.id,
+      artifactId: id,
+    );
+    final markdownPath = sectionsMarkdownPath(collectionId, paper.id, id);
+    final jsonPath = sectionsJsonPath(collectionId, paper.id, id);
+    await writeStringSafely(markdownPath, bundle.markdown);
+    await writeJsonSafely(jsonPath, bundle.json);
+    await writeJsonSafely(
+      p.join(artifactDir(collectionId, paper.id, id), 'manifest.json'),
+      {
+        'schemaVersion': 1,
+        'artifactId': id,
+        'documentId': paper.id,
+        'revisionId': source.id,
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+      },
+    );
+    return (
+      markdownPath: markdownPath,
+      jsonPath: jsonPath,
+      artifactId: id,
+      revisionId: source.id,
+    );
+  }
+
   Future<void> deletePaper(String collectionId, String documentId) async {
     final metaFile = File(paperMetadataPath(collectionId, documentId));
     if (await metaFile.exists()) {
@@ -324,6 +648,14 @@ class LocalStorage {
     final referenceFile = File(referencesPath(collectionId, documentId));
     if (await referenceFile.exists()) {
       await referenceFile.delete();
+    }
+    final artifactDir = Directory(artifactsDir(collectionId, documentId));
+    if (await artifactDir.exists()) {
+      await artifactDir.delete(recursive: true);
+    }
+    final revisionDir = Directory(revisionsDir(collectionId, documentId));
+    if (await revisionDir.exists()) {
+      await revisionDir.delete(recursive: true);
     }
   }
 

@@ -21,7 +21,15 @@ Future<List<PaperChunk>> retrieve(
 
   final Map<int, PaperChunk> chunkMap = {};
   for (final paper in readyPapers) {
-    for (final chunk in paper.chunks) {
+    final active = await storage.loadActiveRevision(collectionId, paper);
+    final activeTextChunks = active?.chunks.isNotEmpty == true
+        ? active!.chunks
+        : paper.chunks.where((chunk) => !chunk.isFigure);
+    final searchable = [
+      ...activeTextChunks,
+      ...paper.chunks.where((chunk) => chunk.isFigure),
+    ];
+    for (final chunk in searchable) {
       chunkMap[chunk.vectorId] = chunk;
     }
   }

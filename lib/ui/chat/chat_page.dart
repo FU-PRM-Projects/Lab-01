@@ -1,11 +1,18 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import 'package:lab_05/app/providers.dart';
 import 'package:lab_05/data/models/chat.dart';
+import 'package:lab_05/data/models/chat_artifact.dart';
 import 'package:lab_05/data/models/citation.dart';
+import 'package:lab_05/data/services/section_artifact_service.dart';
 import 'package:lab_05/ui/chat/chat_controller.dart';
 import 'package:lab_05/ui/chat/tool_call_log.dart';
 import 'package:lab_05/ui/collections/import_controller.dart';
@@ -351,6 +358,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       msg.citations,
                     ),
 
+                    if (msg.artifacts.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      for (final artifact in msg.artifacts) ...[
+                        _SectionArtifactCard(artifact: artifact),
+                        const SizedBox(height: 8),
+                      ],
+                    ],
+
                     // Sources Bar if citations present
                     if (msg.citations.isNotEmpty) ...[
                       const SizedBox(height: 14),
@@ -582,6 +597,9 @@ class _StreamingMessageBubble extends ConsumerWidget {
     final toolCalls = ref.watch(
       chatControllerProvider.select((s) => s.toolCalls),
     );
+    final artifacts = ref.watch(
+      chatControllerProvider.select((s) => s.artifacts),
+    );
 
     ref.listen(chatControllerProvider.select((s) => s.streamingText), (
       prev,
@@ -620,6 +638,20 @@ class _StreamingMessageBubble extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (toolCalls.isNotEmpty) ToolCallLog(calls: toolCalls),
+                  if (toolCalls.any(
+                        (call) =>
+                            call.name == 'export_sections' && call.isRunning,
+                      ) &&
+                      artifacts.isEmpty)
+                    _SavingArtifactCard(
+                      title:
+                          toolCalls
+                              .where((call) => call.name == 'export_sections')
+                              .last
+                              .arguments['paperTitle']
+                              ?.toString() ??
+                          'Paper sections',
+                    ),
                   if (statusMessage != null && text.isEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -656,6 +688,13 @@ class _StreamingMessageBubble extends ConsumerWidget {
                         }
                       },
                     ),
+                  if (artifacts.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    for (final artifact in artifacts) ...[
+                      _SectionArtifactCard(artifact: artifact),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
                   if (text.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
@@ -673,6 +712,718 @@ class _StreamingMessageBubble extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SavingArtifactCard extends StatelessWidget {
+  final String title;
+
+  const _SavingArtifactCard({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: colors.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Preparing export review…',
+                  style: context.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _ArtifactSaveChoice { markdown, json, both }
+
+class _SectionDiff {
+  final String title;
+  final String before;
+  final String after;
+
+  const _SectionDiff({
+    required this.title,
+    required this.before,
+    required this.after,
+  });
+}
+
+enum _DiffKind { unchanged, removed, added }
+
+class _DiffLine {
+  final _DiffKind kind;
+  final String text;
+  final int? oldNumber;
+  final int? newNumber;
+
+  const _DiffLine(this.kind, this.text, this.oldNumber, this.newNumber);
+}
+
+class _SectionDiffView extends StatelessWidget {
+  final List<_SectionDiff> changes;
+
+  const _SectionDiffView({required this.changes});
+
+  @override
+  Widget build(BuildContext context) {
+    if (changes.isEmpty) {
+      return const Center(child: Text('No changed lines.'));
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      itemCount: changes.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        final change = changes[index];
+        final lines = _buildLineDiff(change.before, change.after);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.difference_outlined, size: 17),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      change.title,
+                      style: Theme.of(context).textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.symmetric(
+                  horizontal: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: 1100,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final line in lines) _DiffLineRow(line: line),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DiffLineRow extends StatelessWidget {
+  final _DiffLine line;
+
+  const _DiffLineRow({required this.line});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final (background, stripe, marker) = switch (line.kind) {
+      _DiffKind.removed => (
+        colors.errorContainer.withValues(alpha: 0.58),
+        colors.error,
+        '−',
+      ),
+      _DiffKind.added => (
+        const Color(0xFF2DA44E).withValues(alpha: 0.14),
+        const Color(0xFF2DA44E),
+        '+',
+      ),
+      _ => (Colors.transparent, colors.outlineVariant, ' '),
+    };
+    final numberStyle = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 12,
+      color: colors.onSurfaceVariant,
+    );
+    return Container(
+      constraints: const BoxConstraints(minHeight: 25),
+      decoration: BoxDecoration(
+        color: background,
+        border: Border(left: BorderSide(color: stripe, width: 3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 45,
+            child: Text(
+              line.oldNumber?.toString() ?? '',
+              textAlign: TextAlign.right,
+              style: numberStyle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 45,
+            child: Text(
+              line.newNumber?.toString() ?? '',
+              textAlign: TextAlign.right,
+              style: numberStyle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 18,
+            child: Text(marker, style: numberStyle.copyWith(color: stripe)),
+          ),
+          Expanded(
+            child: SelectableText(
+              line.text.isEmpty ? ' ' : line.text,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12.5,
+                height: 1.45,
+                color: colors.onSurface,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
+    );
+  }
+}
+
+List<_DiffLine> _buildLineDiff(String before, String after) {
+  final oldLines = before.split('\n');
+  final newLines = after.split('\n');
+  final width = newLines.length + 1;
+  // A section can occasionally contain a very large generated block. Keep the
+  // preview responsive instead of allocating an unbounded LCS table.
+  if (oldLines.length * newLines.length > 750000) {
+    return [
+      for (var i = 0; i < oldLines.length; i++)
+        _DiffLine(_DiffKind.removed, oldLines[i], i + 1, null),
+      for (var i = 0; i < newLines.length; i++)
+        _DiffLine(_DiffKind.added, newLines[i], null, i + 1),
+    ];
+  }
+  final table = Uint32List((oldLines.length + 1) * width);
+  for (var oldIndex = oldLines.length - 1; oldIndex >= 0; oldIndex--) {
+    for (var newIndex = newLines.length - 1; newIndex >= 0; newIndex--) {
+      final at = oldIndex * width + newIndex;
+      table[at] = oldLines[oldIndex] == newLines[newIndex]
+          ? table[(oldIndex + 1) * width + newIndex + 1] + 1
+          : table[(oldIndex + 1) * width + newIndex] >=
+                table[oldIndex * width + newIndex + 1]
+          ? table[(oldIndex + 1) * width + newIndex]
+          : table[oldIndex * width + newIndex + 1];
+    }
+  }
+  final result = <_DiffLine>[];
+  var oldIndex = 0;
+  var newIndex = 0;
+  while (oldIndex < oldLines.length && newIndex < newLines.length) {
+    if (oldLines[oldIndex] == newLines[newIndex]) {
+      result.add(
+        _DiffLine(
+          _DiffKind.unchanged,
+          oldLines[oldIndex],
+          oldIndex + 1,
+          newIndex + 1,
+        ),
+      );
+      oldIndex++;
+      newIndex++;
+    } else if (table[(oldIndex + 1) * width + newIndex] >=
+        table[oldIndex * width + newIndex + 1]) {
+      result.add(
+        _DiffLine(_DiffKind.removed, oldLines[oldIndex], oldIndex + 1, null),
+      );
+      oldIndex++;
+    } else {
+      result.add(
+        _DiffLine(_DiffKind.added, newLines[newIndex], null, newIndex + 1),
+      );
+      newIndex++;
+    }
+  }
+  while (oldIndex < oldLines.length) {
+    result.add(
+      _DiffLine(_DiffKind.removed, oldLines[oldIndex], oldIndex + 1, null),
+    );
+    oldIndex++;
+  }
+  while (newIndex < newLines.length) {
+    result.add(
+      _DiffLine(_DiffKind.added, newLines[newIndex], null, newIndex + 1),
+    );
+    newIndex++;
+  }
+  return result;
+}
+
+class _SectionArtifactCard extends ConsumerWidget {
+  final ChatArtifact artifact;
+
+  const _SectionArtifactCard({required this.artifact});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.colorScheme;
+    final isExportDraft = artifact.type == 'sectionDraft';
+    final isChangeDraft = artifact.type == 'sectionChangeDraft';
+    final isDraft = isExportDraft || isChangeDraft;
+    final isRevision = artifact.type == 'sectionRevision';
+    final isDiscarded = artifact.status == 'discarded';
+    final isSuperseded = artifact.status == 'superseded';
+    final formatLabel = switch (artifact.requestedFormat) {
+      'markdown' => 'Markdown',
+      'json' => 'JSON',
+      _ => 'Markdown + JSON',
+    };
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 560),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: colors.secondaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              isChangeDraft
+                  ? Icons.difference_outlined
+                  : Icons.description_outlined,
+              size: 20,
+              color: colors.onSecondaryContainer,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  artifact.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isDraft
+                      ? (isDiscarded
+                            ? 'Draft discarded'
+                            : isSuperseded
+                            ? 'Superseded by a newer chat edit'
+                            : artifact.status == 'index_failed'
+                            ? 'Revision saved · indexing failed · retry available'
+                            : isChangeDraft
+                            ? 'Change draft · review highlighted edits before applying'
+                            : 'Export review · edit in chat or save when ready')
+                      : artifact.status == 'reverted'
+                      ? 'Revision reverted · exported snapshot retained'
+                      : '${artifact.sectionCount} sections · $formatLabel · saved locally',
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: isDiscarded ? null : () => _open(context, ref),
+            child: const Text('Open'),
+          ),
+          if (isDraft && !isDiscarded && !isSuperseded) ...[
+            FilledButton.tonal(
+              onPressed: () => _saveDraft(context, ref),
+              child: Text(
+                artifact.status == 'index_failed'
+                    ? 'Retry indexing'
+                    : isChangeDraft
+                    ? 'Apply changes'
+                    : switch (artifact.requestedFormat) {
+                        'markdown' => 'Save Markdown',
+                        'json' => 'Save JSON',
+                        _ => 'Save both',
+                      },
+              ),
+            ),
+            IconButton(
+              tooltip: 'Discard draft',
+              onPressed: () => _discardDraft(context, ref),
+              icon: const Icon(Icons.delete_outline, size: 19),
+            ),
+          ] else ...[
+            if (isRevision &&
+                artifact.parentRevisionId != null &&
+                artifact.status != 'reverted')
+              TextButton(
+                onPressed: () => _revert(context, ref),
+                child: const Text('Revert'),
+              ),
+            PopupMenuButton<_ArtifactSaveChoice>(
+              tooltip: 'Download artifact',
+              onSelected: (choice) => _save(context, ref, choice),
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: _ArtifactSaveChoice.markdown,
+                  child: Text('Save Markdown'),
+                ),
+                PopupMenuItem(
+                  value: _ArtifactSaveChoice.json,
+                  child: Text('Save JSON'),
+                ),
+                PopupMenuItem(
+                  value: _ArtifactSaveChoice.both,
+                  child: Text('Save both'),
+                ),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Download'),
+                    const SizedBox(width: 3),
+                    Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 17,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<({String markdownPath, String jsonPath})> _ensureFiles(
+    WidgetRef ref,
+  ) async {
+    final storage = ref.read(localStorageProvider);
+    final artifactId = artifact.artifactId;
+    final markdownPath = storage.sectionsMarkdownPath(
+      artifact.collectionId,
+      artifact.documentId,
+      artifactId,
+    );
+    final jsonPath = storage.sectionsJsonPath(
+      artifact.collectionId,
+      artifact.documentId,
+      artifactId,
+    );
+    if (await File(markdownPath).exists() && await File(jsonPath).exists()) {
+      return (markdownPath: markdownPath, jsonPath: jsonPath);
+    }
+    final paper = await storage.loadPaper(
+      artifact.collectionId,
+      artifact.documentId,
+    );
+    if (paper == null) {
+      throw StateError('The source paper is no longer available.');
+    }
+    final revision = artifact.revisionId == null
+        ? null
+        : await storage.loadRevision(
+            artifact.collectionId,
+            artifact.documentId,
+            artifact.revisionId!,
+          );
+    final created = await storage.saveSectionArtifacts(
+      artifact.collectionId,
+      paper,
+      revision: revision,
+      artifactId: artifactId,
+    );
+    return (markdownPath: created.markdownPath, jsonPath: created.jsonPath);
+  }
+
+  Future<void> _open(BuildContext context, WidgetRef ref) async {
+    try {
+      final String markdown;
+      final String json;
+      final isChangeDraft = artifact.type == 'sectionChangeDraft';
+      List<_SectionDiff> changes = const [];
+      if (artifact.type == 'sectionDraft' || isChangeDraft) {
+        final revisionId = artifact.revisionId;
+        if (revisionId == null) throw StateError('Draft revision is missing.');
+        final storage = ref.read(localStorageProvider);
+        final revision = await storage.loadRevision(
+          artifact.collectionId,
+          artifact.documentId,
+          revisionId,
+        );
+        if (revision == null) throw StateError('Draft revision was deleted.');
+        final paper = await storage.loadPaper(
+          artifact.collectionId,
+          artifact.documentId,
+        );
+        if (paper == null) {
+          throw StateError('The source paper is no longer available.');
+        }
+        final preview = SectionArtifactService.build(
+          paper.copyWith(sections: revision.sections),
+          revisionId: revision.id,
+        );
+        markdown = preview.markdown;
+        json = preview.jsonText;
+        if (isChangeDraft) {
+          final parentId = revision.parentRevisionId;
+          final parent = parentId == null
+              ? null
+              : await storage.loadRevision(
+                  artifact.collectionId,
+                  artifact.documentId,
+                  parentId,
+                );
+          final beforeById = {
+            for (final section in parent?.sections ?? paper.sections)
+              section.id: section,
+          };
+          changes = [
+            for (final section in revision.sections)
+              if (beforeById[section.id]?.text != section.text)
+                _SectionDiff(
+                  title: section.displayName,
+                  before: beforeById[section.id]?.text ?? '',
+                  after: section.text,
+                ),
+          ];
+        }
+      } else {
+        final paths = await _ensureFiles(ref);
+        markdown = await File(paths.markdownPath).readAsString();
+        json = await File(paths.jsonPath).readAsString();
+      }
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => DefaultTabController(
+          length: isChangeDraft ? 3 : 2,
+          child: Dialog(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 860, maxHeight: 720),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 8, 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${artifact.title} · '
+                            '${isChangeDraft ? 'Review changes' : 'Export review'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(dialogContext)
+                                .textTheme
+                                .titleMedium,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Close',
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TabBar(
+                    tabs: [
+                      if (isChangeDraft) const Tab(text: 'Changes'),
+                      const Tab(text: 'Markdown'),
+                      const Tab(text: 'JSON'),
+                    ],
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        if (isChangeDraft) _SectionDiffView(changes: changes),
+                        Markdown(
+                          data: SectionArtifactService.readableMarkdown(
+                            markdown,
+                          ),
+                          selectable: true,
+                          padding: const EdgeInsets.all(20),
+                          styleSheet: _ChatPageState.createMarkdownStyle(
+                            dialogContext,
+                          ),
+                        ),
+                        SingleChildScrollView(
+                          padding: const EdgeInsets.all(20),
+                          child: SelectableText(
+                            json,
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12.5,
+                              height: 1.45,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (context.mounted) _showError(context, error);
+    }
+  }
+
+  Future<void> _saveDraft(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref
+          .read(chatControllerProvider.notifier)
+          .saveDraftRevision(artifact);
+    } catch (error) {
+      if (context.mounted) _showError(context, error);
+    }
+  }
+
+  Future<void> _discardDraft(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref
+          .read(chatControllerProvider.notifier)
+          .discardDraftRevision(artifact);
+    } catch (error) {
+      if (context.mounted) _showError(context, error);
+    }
+  }
+
+  Future<void> _revert(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(chatControllerProvider.notifier).revertRevision(artifact);
+    } catch (error) {
+      if (context.mounted) _showError(context, error);
+    }
+  }
+
+  Future<void> _save(
+    BuildContext context,
+    WidgetRef ref,
+    _ArtifactSaveChoice choice,
+  ) async {
+    try {
+      final paths = await _ensureFiles(ref);
+      final baseName = _safeFileName(artifact.title);
+      if (choice == _ArtifactSaveChoice.both) {
+        final directory = await FilePicker.getDirectoryPath(
+          dialogTitle: 'Save section artifacts',
+        );
+        if (directory == null || directory.isEmpty) return;
+        await File(paths.markdownPath)
+            .copy(p.join(directory, '${baseName}_sections.md'));
+        await File(paths.jsonPath)
+            .copy(p.join(directory, '${baseName}_sections.json'));
+      } else {
+        final markdown = choice == _ArtifactSaveChoice.markdown;
+        final sourcePath = markdown ? paths.markdownPath : paths.jsonPath;
+        final extension = markdown ? 'md' : 'json';
+        final destination = await FilePicker.saveFile(
+          dialogTitle: markdown
+              ? 'Save sections as Markdown'
+              : 'Save sections as JSON',
+          fileName: '${baseName}_sections.$extension',
+          bytes: await File(sourcePath).readAsBytes(),
+          mimeType: markdown ? 'text/markdown' : 'application/json',
+          type: FileType.custom,
+          allowedExtensions: [extension],
+        );
+        if (destination == null) return;
+      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Section artifact saved'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (context.mounted) _showError(context, error);
+    }
+  }
+
+  static String _safeFileName(String value) {
+    final cleaned = value
+        .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^[_. ]+|[_. ]+$'), '');
+    return cleaned.isEmpty ? 'paper' : cleaned;
+  }
+
+  static void _showError(BuildContext context, Object error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Could not open section artifact: $error'),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

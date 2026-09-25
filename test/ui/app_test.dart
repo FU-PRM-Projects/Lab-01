@@ -53,7 +53,7 @@ void main() {
     expect(find.text('PaperChat'), findsOneWidget);
     expect(find.text('Projects'), findsOneWidget);
     expect(find.text('New chat'), findsOneWidget);
-    expect(find.text('Summarize main methodology and novelty'), findsOneWidget);
+    expect(find.text('Import paper (PDF)'), findsOneWidget);
     expect(
       find.byWidgetPredicate(
         (w) =>

@@ -1,4 +1,5 @@
 import 'package:lab_05/data/models/citation.dart';
+import 'package:lab_05/data/models/chat_artifact.dart';
 import 'package:lab_05/data/models/tool_call_record.dart';
 
 class ChatMessage {
@@ -13,6 +14,7 @@ class ChatMessage {
   /// Tools the agent ran while producing this message, in the order it ran
   /// them. Always empty for user messages.
   final List<ToolCallRecord> toolCalls;
+  final List<ChatArtifact> artifacts;
 
   const ChatMessage({
     required this.id,
@@ -23,6 +25,7 @@ class ChatMessage {
     this.model,
     this.citations = const [],
     this.toolCalls = const [],
+    this.artifacts = const [],
   });
 
   ChatMessage copyWith({
@@ -31,6 +34,7 @@ class ChatMessage {
     List<Citation>? citations,
     String? model,
     List<ToolCallRecord>? toolCalls,
+    List<ChatArtifact>? artifacts,
   }) {
     return ChatMessage(
       id: id,
@@ -41,12 +45,14 @@ class ChatMessage {
       model: model ?? this.model,
       citations: citations ?? this.citations,
       toolCalls: toolCalls ?? this.toolCalls,
+      artifacts: artifacts ?? this.artifacts,
     );
   }
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     final rawCitations = (json['citations'] as List<dynamic>?) ?? [];
     final rawToolCalls = (json['toolCalls'] as List<dynamic>?) ?? [];
+    final rawArtifacts = (json['artifacts'] as List<dynamic>?) ?? [];
     return ChatMessage(
       id: json['id'] as String,
       role: json['role'] as String? ?? 'user',
@@ -62,6 +68,9 @@ class ChatMessage {
       toolCalls: rawToolCalls
           .map((t) => ToolCallRecord.fromJson(t as Map<String, dynamic>))
           .toList(),
+      artifacts: rawArtifacts
+          .map((a) => ChatArtifact.fromJson(a as Map<String, dynamic>))
+          .toList(),
     );
   }
 
@@ -75,6 +84,7 @@ class ChatMessage {
       'model': model,
       'citations': citations.map((c) => c.toJson()).toList(),
       'toolCalls': toolCalls.map((t) => t.toJson()).toList(),
+      'artifacts': artifacts.map((a) => a.toJson()).toList(),
     };
   }
 }
