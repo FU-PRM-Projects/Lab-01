@@ -191,6 +191,7 @@ $initialEvidence
         final canCallTools = step < 3 && toolsUsed < 4;
         ChatResult? response;
         final stepText = StringBuffer();
+        var visibleTextEmitted = false;
         await for (final chunk in model.stream(
           PromptValue.chat(conversation),
           options: ChatOpenAIOptions(
@@ -206,7 +207,18 @@ $initialEvidence
               .whereType<AIChatMessageTextBlock>()
               .map((block) => block.text)
               .join();
-          if (text.isNotEmpty) stepText.write(text);
+          if (text.isNotEmpty) {
+            stepText.write(text);
+            if (visibleTextEmitted) {
+              answer.write(text);
+              yield TextChunk(text);
+            } else if (!_couldBeDsml(stepText.toString())) {
+              final visible = stepText.toString();
+              answer.write(visible);
+              yield TextChunk(visible);
+              visibleTextEmitted = true;
+            }
+          }
         }
         if (_isCancelled) return;
         if (response == null) {
@@ -221,7 +233,12 @@ $initialEvidence
             : dsmlCalls;
         if (toolCalls.isEmpty) {
           final text = stepText.toString();
-          if (text.isNotEmpty) {
+          if (text.toUpperCase().contains('DSML')) {
+            throw StateError(
+              'The model returned malformed tool instructions. Please retry.',
+            );
+          }
+          if (text.isNotEmpty && !visibleTextEmitted) {
             answer.write(text);
             yield TextChunk(text);
           }
@@ -510,6 +527,14 @@ $initialEvidence
 
   static int _elapsed(DateTime start) =>
       DateTime.now().difference(start).inMilliseconds;
+
+  static bool _couldBeDsml(String text) {
+    final trimmed = text.trimLeft();
+    if (trimmed.toUpperCase().contains('DSML')) return true;
+    // A DSML control token can be split across several streaming chunks.
+    // Hold a short leading tag until there is enough text to classify it.
+    return trimmed.startsWith('<') && trimmed.length < 64;
+  }
 
   /// Converts the textual DSML tool syntax emitted by a few OpenRouter models
   /// into the same canonical calls returned by providers with native tool
